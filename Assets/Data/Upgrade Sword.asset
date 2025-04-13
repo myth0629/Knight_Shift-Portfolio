@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   weaponName: Upgrade Sword
   damage: 15
+  weaponModelPrefab: {fileID: 731441855371914503, guid: 3d332d758f448440594657c179f56ba9, type: 3}

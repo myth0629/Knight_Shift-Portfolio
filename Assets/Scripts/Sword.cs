@@ -1,20 +1,17 @@
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
-public class Sword : Weapon
+public class Sword : MonoBehaviour
 {
     public WeaponData weaponData;
 
-    void Start()
+    void Update()
     {
-        if(weaponData != null)
-        {
-            weaponName = weaponData.weaponName;
-            damage = weaponData.damage;
-        }
+        Debug.Log(weaponData.damage);
     }
 
-    public override void Attack()
+    public void Attack()
     {
-        Debug.Log("Sword attack with damage: " + weaponData.damage);
+        // 공통 로직
     }
 }
