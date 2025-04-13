@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7e1d8842cb6f4d4b9329eefba3fa3ec, type: 3}
+  m_Name: Upgrade Axe - 1
+  m_EditorClassIdentifier: 
+  weaponName: Upgrade Axe 1
+  weaponType: 1
+  damage: 12
+  weaponModelPrefab: {fileID: 3433095496918451345, guid: a3b8b17d189f24f53afaaf11fc4093df, type: 3}

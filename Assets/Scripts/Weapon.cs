@@ -1,8 +1,18 @@
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
-public abstract class Weapon : MonoBehaviour
+public class Weapon : MonoBehaviour
 {
-    public string weaponName;
-    public float damage;
-    public abstract void Attack();
+    public WeaponData weaponData;
+
+
+    public void ApplyWeaponTypeToAnimator(Animator animator)
+    {
+        animator.SetInteger("WeaponType", (int)weaponData.weaponType);
+    }
+
+    public void Attack()
+    {
+        // 공통 로직
+    }
 }

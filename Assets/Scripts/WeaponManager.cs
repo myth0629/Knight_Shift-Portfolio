@@ -5,10 +5,11 @@ using UnityEngine.InputSystem;
 public class WeaponManager : MonoBehaviour
 {
     public Transform weaponHolder;
-    public Sword currentWeapon;
+    public Weapon currentWeapon;
     [SerializeField] WeaponData currentWeaponData;
     [SerializeField] WeaponData StartWeaponData;
     [SerializeField] WeaponData testWeaponData;
+    [SerializeField] private Animator animator;
 
     void Start()
     {
@@ -38,8 +39,8 @@ public class WeaponManager : MonoBehaviour
         newWeaponObj.transform.localPosition = Vector3.zero;
         newWeaponObj.transform.localRotation = Quaternion.identity;
 
-        // Sword 스크립트 가져오기
-        currentWeapon = newWeaponObj.GetComponent<Sword>();
+        // Weapon 스크립트 가져오기
+        currentWeapon = newWeaponObj.GetComponent<Weapon>();
 
         // 무기 데이터 설정
         if (currentWeapon != null)
@@ -47,10 +48,14 @@ public class WeaponManager : MonoBehaviour
             currentWeapon.weaponData = newWeaponData;
             currentWeaponData = newWeaponData; // 현재 무기 데이터도 업데이트
             Debug.Log("무기 장착: " + newWeaponData.weaponName);
+
+            currentWeapon.ApplyWeaponTypeToAnimator(animator);
+
+            Debug.Log($"무기 변경됨: {newWeaponData.weaponName}, 타입: {newWeaponData.weaponType}");
         }
         else
         {
-            Debug.LogWarning("무기 프리팹에 Sword 스크립트가 없습니다!");
+            Debug.LogWarning("무기 프리팹에 Weapon 스크립트가 없습니다!");
         }
     }
 }
