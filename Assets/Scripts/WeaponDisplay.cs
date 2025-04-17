@@ -44,7 +44,7 @@ public class WeaponDisplay : MonoBehaviour
             weaponNameText.text = "Unknown Weapon";
         }
 
-        // selectButton.onClick.RemoveAllListeners();
-        // selectButton.onClick.AddListener(() => upgradeManager.SelectWeapon(assignedWeaponPrefab));
+        selectButton.onClick.RemoveAllListeners();
+        selectButton.onClick.AddListener(() => weaponManager.EquipWeapon(weapon.weaponData));
     }
 }
