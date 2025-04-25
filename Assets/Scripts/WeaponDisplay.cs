@@ -11,16 +11,12 @@ public class WeaponDisplay : MonoBehaviour
     private GameObject spawnedWeapon;
     private GameObject assignedWeaponPrefab;
 
-    private WeaponManager weaponManager;
+    public WeaponManager weaponManager;
+    public UIManager uiManager;
 
-    public void Init(WeaponManager manager)
+    public void DisplaySetWeapon(WeaponData weaponData)
     {
-        weaponManager = manager;
-    }
-
-    public void SetWeapon(GameObject weaponPrefab)
-    {
-        assignedWeaponPrefab = weaponPrefab;
+        assignedWeaponPrefab = weaponData.weaponModelPrefab;
 
         // 기존 무기 제거
         if (spawnedWeapon != null)
@@ -29,22 +25,32 @@ public class WeaponDisplay : MonoBehaviour
         }
 
         // 무기 생성 및 부모 설정
-        spawnedWeapon = Instantiate(weaponPrefab, weaponParent);
+        spawnedWeapon = Instantiate(assignedWeaponPrefab, weaponParent);
         spawnedWeapon.transform.localPosition = Vector3.zero;
         spawnedWeapon.transform.localRotation = Quaternion.identity;
 
         // 무기 이름 표시
-        Weapon weapon = spawnedWeapon.GetComponent<Weapon>();
-        if (weapon != null)
+        if (weaponData != null)
         {
-            weaponNameText.text = weapon.weaponData.weaponName;
+            weaponNameText.text = weaponData.weaponName;
         }
         else
         {
             weaponNameText.text = "Unknown Weapon";
         }
 
-        selectButton.onClick.RemoveAllListeners();
-        selectButton.onClick.AddListener(() => weaponManager.EquipWeapon(weapon.weaponData));
+        if (weaponData != null && weaponManager != null)
+        {
+            selectButton.onClick.RemoveAllListeners();
+            selectButton.onClick.AddListener(() =>
+            {
+                weaponManager.EquipWeapon(weaponData);
+                uiManager.ToggleUIPanel();
+            });
+        }
+        else
+        {
+            Debug.LogWarning("무기 정보 또는 weaponManager가 null입니다.");
+        }
     }
 }

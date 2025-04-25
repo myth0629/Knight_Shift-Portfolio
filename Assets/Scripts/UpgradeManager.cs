@@ -26,7 +26,7 @@ public class UpgradeManager : MonoBehaviour
             usedIndices.Add(randIndex);
             selected[i] = allWeapons[randIndex];
 
-            displaySlots[i].SetWeapon(selected[i].weaponModelPrefab);
+            displaySlots[i].DisplaySetWeapon(selected[i]);
         }
     }
 }
