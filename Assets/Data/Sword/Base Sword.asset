@@ -13,5 +13,6 @@ MonoBehaviour:
   m_Name: Base Sword
   m_EditorClassIdentifier: 
   weaponName: Base Sword
+  weaponType: 0
   damage: 10
   weaponModelPrefab: {fileID: 2645307744113326944, guid: 8166bbf1d57f048aa9e4333a3e51f7ee, type: 3}
