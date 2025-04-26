@@ -37,7 +37,7 @@ public class WeaponManager : MonoBehaviour
         // 새 무기 프리팹 생성 및 장착
         GameObject newWeaponObj = Instantiate(newWeaponData.weaponModelPrefab, weaponHolder);
         newWeaponObj.transform.localPosition = Vector3.zero;
-        newWeaponObj.transform.localRotation = Quaternion.identity;
+        newWeaponObj.transform.localRotation = Quaternion.Euler(0, 180f, 0);
 
         // Weapon 스크립트 가져오기
         currentWeapon = newWeaponObj.GetComponent<Weapon>();
