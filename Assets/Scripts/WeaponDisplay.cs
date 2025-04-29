@@ -11,8 +11,14 @@ public class WeaponDisplay : MonoBehaviour
     private GameObject spawnedWeapon;
     private GameObject assignedWeaponPrefab;
 
-    public WeaponManager weaponManager;
-    public UIManager uiManager;
+    WeaponManager weaponManager;
+    UIManager uiManager;
+
+    void Start()
+    {
+        weaponManager = FindFirstObjectByType<WeaponManager>();
+        uiManager = FindFirstObjectByType<UIManager>();
+    }
 
     public void DisplaySetWeapon(WeaponData weaponData)
     {

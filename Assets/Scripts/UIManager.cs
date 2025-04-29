@@ -1,3 +1,4 @@
+using TMPro;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -5,7 +6,7 @@ public class UIManager : MonoBehaviour
 {
     public GameObject uiPanel;  // 켜고 끌 UI 패널
     public CinemachineCamera vcam;
-
+    
     private bool isPanelOpen = false;
 
     void Update()
