@@ -1,11 +1,13 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Weapon : MonoBehaviour
 {
     public WeaponData weaponData;
     [SerializeField] private Collider damageCollider;
+    [SerializeField] public string targetTag;
     private float damage;
     
     //private List<Collider> targetsHitDuringSwing = new List<Collider>();
@@ -58,13 +60,16 @@ public class Weapon : MonoBehaviour
             return;
         }
         
-        if (other.CompareTag("Enemy"))
+        // 설정된 targetTag와 충돌한 대상의 태그 비교
+        if (!string.IsNullOrEmpty(targetTag) && other.CompareTag(targetTag))
         {
-            Skeleton skeleton = other.GetComponent<Skeleton>();
-            if (skeleton != null)
+            // IDamageable 인터페이스를 가진 컴포넌트 찾기
+            IDamageable damageable = other.GetComponent<IDamageable>();
+            if (damageable != null)
             {
-                skeleton.TakeDamage(damage);
+                damageable.TakeDamage(damage);
             }
+            // GetComponentInChildren 또는 GetComponentInParent 등을 사용할 수도 있음
         }
     }
 }
