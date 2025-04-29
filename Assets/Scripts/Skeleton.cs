@@ -74,6 +74,7 @@ public class Skeleton : MonoBehaviour
     
     public void TakeDamage(float damage)
     {
+        attackTimer = attackCooldown;
         Debug.Log("Skeleton Damage Taken: " + damage);
         currentHp -= damage;
         animator.SetTrigger("Hit");
@@ -87,7 +88,7 @@ public class Skeleton : MonoBehaviour
     void Die()
     {
         Debug.Log("Skeleton Died");
-        animator.SetTrigger("Die");
+        animator.SetTrigger("Death");
         agent.isStopped = true;
         Destroy(gameObject, 3f);
     }
