@@ -69,7 +69,6 @@ public class Weapon : MonoBehaviour
             {
                 damageable.TakeDamage(damage);
             }
-            // GetComponentInChildren 또는 GetComponentInParent 등을 사용할 수도 있음
         }
     }
 }

@@ -18,7 +18,7 @@ public class Skeleton : MonoBehaviour, IDamageable
     float attackTimer;
     bool isAttacking = false;
     
-    Transform player;
+    public Transform player;
     NavMeshAgent agent;
     Animator animator;
     Collider collider;
@@ -32,14 +32,14 @@ public class Skeleton : MonoBehaviour, IDamageable
 
     void Start()
     {
-        player = GameObject.FindGameObjectWithTag("Player").transform;
-        
         currentHp = maxHp;
     }
 
     private void Update()
     {
         animator.SetFloat("Speed", agent.velocity.magnitude);
+        
+        Debug.Log(transform.position + " " + player.position);
         
         if(Vector3.Distance(transform.position, player.position) < attackRange)
         {
@@ -65,14 +65,13 @@ public class Skeleton : MonoBehaviour, IDamageable
         agent.isStopped = true;
         isAttacking = true;
         attackTimer = attackCooldown;
-        //player.GetComponent<PlayerStatus>().TakeDamage(attackDamage);
     }
 
     void ChasePlayer()
     {
+        agent.isStopped = false;
         animator.SetFloat("Speed", agent.velocity.magnitude);
         agent.SetDestination(player.position);
-        agent.isStopped = false;
     }
     
     public void TakeDamage(float damageAmount)
