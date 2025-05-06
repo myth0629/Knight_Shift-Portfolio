@@ -12,9 +12,9 @@ public class Skeleton : MonoBehaviour, IDamageable
     
     [Header("공격 설정")]
     [SerializeField] float attackRange = 1.5f;
-    [SerializeField] float attackDamage = 20f;
+    [SerializeField] float attackDamage = 20f; // Init 함수 통해 Weapon에 넘겨줌
     [SerializeField] float attackCooldown = 1f;
-    [SerializeField] Weapon weapon;
+    Weapon weapon;
     float attackTimer;
     bool isAttacking = false;
     
@@ -25,6 +25,7 @@ public class Skeleton : MonoBehaviour, IDamageable
 
     private void Awake()
     {
+        weapon = GetComponentInChildren<Weapon>();
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
         collider = GetComponent<Collider>();
@@ -33,13 +34,12 @@ public class Skeleton : MonoBehaviour, IDamageable
     void Start()
     {
         currentHp = maxHp;
+        weapon.Init(attackDamage); // Weapon에 공격 데미지 전달
     }
 
     private void Update()
     {
         animator.SetFloat("Speed", agent.velocity.magnitude);
-        
-        Debug.Log(transform.position + " " + player.position);
         
         if(Vector3.Distance(transform.position, player.position) < attackRange)
         {
@@ -89,10 +89,9 @@ public class Skeleton : MonoBehaviour, IDamageable
     
     void Die()
     {
-        Debug.Log("Skeleton Died");
         animator.SetTrigger("Death");
         collider.enabled = false;
-        agent.isStopped = true;
+        agent.enabled = false;
         Destroy(gameObject, 3f);
     }
     

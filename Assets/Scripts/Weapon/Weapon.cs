@@ -1,5 +1,3 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,10 +6,10 @@ public class Weapon : MonoBehaviour
     public WeaponData weaponData;
     [SerializeField] private Collider damageCollider;
     [SerializeField] public string targetTag;
-    private float damage;
-    
-    //private List<Collider> targetsHitDuringSwing = new List<Collider>();
-    
+    [SerializeField] float damage;
+
+    private List<Collider> targetsHitDuringSwing = new List<Collider>(); // 주석 해제
+
     public void ApplyWeaponTypeToAnimator(Animator animator)
     {
         animator.SetInteger("WeaponType", (int)weaponData.weaponType);
@@ -19,25 +17,25 @@ public class Weapon : MonoBehaviour
 
     private void Awake()
     {
-        // Collider가 비활성화된 상태로 시작하도록 설정 (선택적)
+        damage = weaponData.damage;
+        
         if (damageCollider == null)
         {
-            damageCollider = GetComponent<Collider>(); // 콜라이더 자동 할당 시도
+            damageCollider = GetComponent<Collider>();
         }
-        // 시작 시에는 콜라이더 비활성화
         DisableDamageCollider();
     }
 
-    private void Start()
+    public void Init(float damage)
     {
-        damage = weaponData.damage;
+        this.damage = damage;
     }
 
     // 애니메이션 이벤트
     public void EnableDamageCollider()
     {
         // 새로운 공격 시작 시, 이전에 맞았던 타겟 리스트 초기화
-        //targetsHitDuringSwing.Clear();
+        targetsHitDuringSwing.Clear(); // 주석 해제
         damageCollider.enabled = true;
         Debug.Log("Weapon Collider Enabled");
     }
@@ -46,7 +44,6 @@ public class Weapon : MonoBehaviour
     public void DisableDamageCollider()
     {
         damageCollider.enabled = false;
-        // Debug.Log("Weapon Collider Disabled");
     }
     
     private void OnTriggerEnter(Collider other)
@@ -55,7 +52,7 @@ public class Weapon : MonoBehaviour
         if (!damageCollider.enabled) return;
 
         // 자기 자신이나 이미 맞은 대상은 무시
-        if (other == damageCollider) //|| targetsHitDuringSwing.Contains(other))
+        if (other == damageCollider || targetsHitDuringSwing.Contains(other))
         {
             return;
         }
@@ -67,6 +64,7 @@ public class Weapon : MonoBehaviour
             IDamageable damageable = other.GetComponent<IDamageable>();
             if (damageable != null)
             {
+                targetsHitDuringSwing.Add(other); // 히트 목록에 추가
                 damageable.TakeDamage(damage);
             }
         }
