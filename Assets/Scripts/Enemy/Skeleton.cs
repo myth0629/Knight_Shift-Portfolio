@@ -16,7 +16,8 @@ public class Skeleton : MonoBehaviour, IDamageable
     [SerializeField] float attackCooldown = 1f;
     Weapon weapon;
     float attackTimer;
-    bool isAttacking = false;
+    public bool isAttacking = false;
+    bool isDead = false;
     
     public Transform player;
     NavMeshAgent agent;
@@ -39,6 +40,8 @@ public class Skeleton : MonoBehaviour, IDamageable
 
     private void Update()
     {
+        if(isDead) return;
+        
         animator.SetFloat("Speed", agent.velocity.magnitude);
         
         if(Vector3.Distance(transform.position, player.position) < attackRange)
@@ -67,8 +70,16 @@ public class Skeleton : MonoBehaviour, IDamageable
         attackTimer = attackCooldown;
     }
 
+    public void attackEnd()
+    {
+        isAttacking = false;
+        agent.isStopped = false;
+    }
+
     void ChasePlayer()
     {
+        if(isAttacking) return;
+        
         agent.isStopped = false;
         animator.SetFloat("Speed", agent.velocity.magnitude);
         agent.SetDestination(player.position);
@@ -89,9 +100,10 @@ public class Skeleton : MonoBehaviour, IDamageable
     
     void Die()
     {
+        isDead = true;
         animator.SetTrigger("Death");
         collider.enabled = false;
-        agent.enabled = false;
+        agent.isStopped = true;
         Destroy(gameObject, 3f);
     }
     

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// 각 무기 프리팹에 할당
 public class Weapon : MonoBehaviour
 {
     public WeaponData weaponData;
@@ -35,9 +36,8 @@ public class Weapon : MonoBehaviour
     public void EnableDamageCollider()
     {
         // 새로운 공격 시작 시, 이전에 맞았던 타겟 리스트 초기화
-        targetsHitDuringSwing.Clear(); // 주석 해제
+        targetsHitDuringSwing.Clear();
         damageCollider.enabled = true;
-        Debug.Log("Weapon Collider Enabled");
     }
 
     // 애니메이션 이벤트
@@ -48,7 +48,6 @@ public class Weapon : MonoBehaviour
     
     private void OnTriggerEnter(Collider other)
     {
-        Debug.Log(other.name);
         if (!damageCollider.enabled) return;
 
         // 자기 자신이나 이미 맞은 대상은 무시
