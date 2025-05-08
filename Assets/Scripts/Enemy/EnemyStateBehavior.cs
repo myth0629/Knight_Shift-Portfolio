@@ -11,12 +11,16 @@ public class EnemyStateBehavior : StateMachineBehaviour
         skeleton = animator.GetComponent<Skeleton>();
         agent = animator.GetComponent<NavMeshAgent>();
         
+        skeleton.EnableWeaponCollider();
+        
         skeleton.isAttacking = true;
         agent.isStopped = true;
     }
 
     override public void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {   
+        skeleton.DisableWeaponCollider();
+        
         skeleton.isAttacking = false;
         agent.isStopped = false;
     }

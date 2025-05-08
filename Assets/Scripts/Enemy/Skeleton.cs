@@ -19,8 +19,9 @@ public class Skeleton : MonoBehaviour, IDamageable
     public bool isAttacking = false;
     [SerializeField] bool canAttack = true;
     bool isDead = false;
+    private PlayerStatus player;
     
-    public Transform player;
+    public Transform playerTransform;
     NavMeshAgent agent;
     Animator animator;
 
@@ -29,6 +30,7 @@ public class Skeleton : MonoBehaviour, IDamageable
         weapon = GetComponentInChildren<Weapon>();
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
+        player = FindFirstObjectByType<PlayerStatus>();
     }
 
     void Start()
@@ -39,14 +41,13 @@ public class Skeleton : MonoBehaviour, IDamageable
 
     private void Update()
     {
-        if(isDead) return;
+        if(isDead || player.isDead) return;
         
-        Debug.Log(attackTimer);
         attackTimer += Time.deltaTime;
         
         animator.SetFloat("Speed", agent.velocity.magnitude);
         
-        if(Vector3.Distance(transform.position, player.position) < attackRange)
+        if(Vector3.Distance(transform.position, playerTransform.position) < attackRange)
         {
             Attack();
         }
@@ -83,7 +84,7 @@ public class Skeleton : MonoBehaviour, IDamageable
         
         agent.isStopped = false;
         animator.SetFloat("Speed", agent.velocity.magnitude);
-        agent.SetDestination(player.position);
+        agent.SetDestination(playerTransform.position);
     }
     
     public void TakeDamage(float damageAmount)
