@@ -22,14 +22,12 @@ public class Skeleton : MonoBehaviour, IDamageable
     public Transform player;
     NavMeshAgent agent;
     Animator animator;
-    Collider collider;
 
     private void Awake()
     {
         weapon = GetComponentInChildren<Weapon>();
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
-        collider = GetComponent<Collider>();
     }
 
     void Start()
@@ -102,7 +100,7 @@ public class Skeleton : MonoBehaviour, IDamageable
     {
         isDead = true;
         animator.SetTrigger("Death");
-        collider.enabled = false;
+        GetComponent<Collider>().enabled = false;
         agent.isStopped = true;
         Destroy(gameObject, 3f);
     }
