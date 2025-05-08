@@ -17,6 +17,7 @@ public class Skeleton : MonoBehaviour, IDamageable
     Weapon weapon;
     float attackTimer;
     public bool isAttacking = false;
+    [SerializeField] bool canAttack = true;
     bool isDead = false;
     
     public Transform player;
@@ -40,31 +41,40 @@ public class Skeleton : MonoBehaviour, IDamageable
     {
         if(isDead) return;
         
+        Debug.Log(attackTimer);
+        attackTimer += Time.deltaTime;
+        
         animator.SetFloat("Speed", agent.velocity.magnitude);
         
         if(Vector3.Distance(transform.position, player.position) < attackRange)
         {
-            if (isAttacking)
-            {
-                attackTimer -= Time.deltaTime;
-                if (attackTimer <= 0f)
-                {
-                    isAttacking = false;
-                }
-            }
-            else Attack();
+            Attack();
         }
         else
         {
             ChasePlayer();
         }
+        
+        AttackCooldown();
+    }
+
+    void AttackCooldown()
+    {
+        if (attackTimer >= attackCooldown)
+        {
+            canAttack = true;
+        }
     }
 
     void Attack()
     {  
+        if(!canAttack) return;
+        
         animator.SetTrigger("Attack");
-        attackTimer = attackCooldown;
         agent.isStopped = true;
+        canAttack = false;
+        attackTimer = 0;
+        AttackCooldown();
     }
 
     void ChasePlayer()
@@ -81,6 +91,7 @@ public class Skeleton : MonoBehaviour, IDamageable
         attackTimer = attackCooldown;
         Debug.Log("Skeleton Damage Taken: " + damageAmount);
         currentHp -= damageAmount;
+        attackTimer = 1; // 피격 시 공격 쿨타임 증가
         animator.SetTrigger("Hit");
         if (currentHp <= 0)
         {

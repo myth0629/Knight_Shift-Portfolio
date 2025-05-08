@@ -10,14 +10,14 @@ public class EnemyStateBehavior : StateMachineBehaviour
     {
         skeleton = animator.GetComponent<Skeleton>();
         agent = animator.GetComponent<NavMeshAgent>();
-
-        agent.isStopped = true;
+        
         skeleton.isAttacking = true;
+        agent.isStopped = true;
     }
 
     override public void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
-    {
-        agent.isStopped = false;
+    {   
         skeleton.isAttacking = false;
+        agent.isStopped = false;
     }
 }
