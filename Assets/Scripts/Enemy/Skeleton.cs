@@ -63,15 +63,8 @@ public class Skeleton : MonoBehaviour, IDamageable
     void Attack()
     {  
         animator.SetTrigger("Attack");
-        agent.isStopped = true;
-        isAttacking = true;
         attackTimer = attackCooldown;
-    }
-
-    public void attackEnd()
-    {
-        isAttacking = false;
-        agent.isStopped = false;
+        agent.isStopped = true;
     }
 
     void ChasePlayer()

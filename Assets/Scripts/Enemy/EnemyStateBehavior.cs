@@ -1,16 +1,23 @@
 using UnityEngine;
+using UnityEngine.AI;
 
-public class EnemyStateBehavior : MonoBehaviour
+public class EnemyStateBehavior : StateMachineBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    private Skeleton skeleton;
+    private NavMeshAgent agent;
+    
+    override public void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
-        
+        skeleton = animator.GetComponent<Skeleton>();
+        agent = animator.GetComponent<NavMeshAgent>();
+
+        agent.isStopped = true;
+        skeleton.isAttacking = true;
     }
 
-    // Update is called once per frame
-    void Update()
+    override public void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
     {
-        
+        agent.isStopped = false;
+        skeleton.isAttacking = false;
     }
 }
