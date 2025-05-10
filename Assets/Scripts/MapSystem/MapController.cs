@@ -1,87 +1,127 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using System.Linq;
-using System;
 
 namespace MapSystem
 {
     public enum NodeType
     {
+        Start,
         Battle,
         Event,
         Shop,
         Camp,
         Elite,
-        Boss,
-        Start
+        Boss
     }
-
+    
     [System.Serializable]
     public class NodeTypeDistribution
     {
+        [Tooltip("노드 타입")]
         public NodeType nodeType;
+        
+        [Tooltip("생성 확률 (%)")]
         [Range(0, 100)]
         public float percentage;
     }
-
+    
     [System.Serializable]
     public class MapNode
     {
+        [Tooltip("노드 고유 ID")]
         public int id;
+        
+        [Tooltip("노드 타입")]
         public NodeType nodeType;
-        public Vector2 position;
-        public List<int> connectedNodesIds = new List<int>();
+        
+        [Tooltip("노드가 위치한 층")]
         public int layer;
+        
+        [Tooltip("층 내에서의 위치 인덱스")]
         public int depth;
-
-        // Scene to load when this node is selected
+        
+        [Tooltip("UI 상의 위치")]
+        public Vector2 position;
+        
+        [Tooltip("이 노드 선택 시 로드할 씬 이름")]
         public string sceneName;
         
-        // Difficulty/reward scaling
+        [Tooltip("난이도 배율")]
         public float difficultyMultiplier = 1f;
+        
+        [Tooltip("보상 배율")]
         public float rewardMultiplier = 1f;
+        
+        // 노드 연결 정보
+        [Tooltip("이 노드에서 갈 수 있는 다음 노드들의 ID")]
+        public List<int> childNodeIds = new List<int>();
+        
+        [Tooltip("이 노드로 올 수 있는 이전 노드들의 ID")]
+        public List<int> parentNodeIds = new List<int>();
+        
+        // 노드 상태 추적
+        [Tooltip("현재 접근 가능한 노드인지")]
+        public bool isAccessible = false;
+        
+        [Tooltip("이미 완료한 노드인지")]
+        public bool isCompleted = false;
+        
+        [Tooltip("현재 선택된 노드인지")]
+        public bool isCurrent = false;
     }
 
     public class MapController : MonoBehaviour
     {
         [Header("Map Generation Settings")]
-        [SerializeField] private int totalLayers = 3;
-        [SerializeField] private int minNodesPerLayer = 15;
-        [SerializeField] private int maxNodesPerLayer = 20;
-        [SerializeField] private int minDepthPerLayer = 10;
-        [SerializeField] private int maxDepthPerLayer = 12;
+        [Tooltip("시작부터 보스까지의 총 층 수")]
+        [SerializeField] private int totalLayers = 6; // 시작~보스 총 6층
+        
+        [Tooltip("각 층당 최소 노드 수")]
+        [SerializeField] private int minNodesPerLayer = 2; // 층당 최소 2개 노드
+        
+        [Tooltip("각 층당 최대 노드 수")]
+        [SerializeField] private int maxNodesPerLayer = 4; // 층당 최대 4개 노드
         
         [Header("Node Connection Settings")]
-        [SerializeField] private int minBranchesPerNode = 1;
-        [SerializeField] private int maxBranchesPerNode = 3;
-        [SerializeField] private float branchingProbability = 0.7f;
+        [Tooltip("각 노드가 다음 층에 연결할 최소 노드 수")]
+        [SerializeField] private int minBranchesPerNode = 1; // 다음 층의 최소 1개와 연결
+        
+        [Tooltip("각 노드가 다음 층에 연결할 최대 노드 수")]
+        [SerializeField] private int maxBranchesPerNode = 2; // 다음 층의 최대 2개와 연결
         
         [Header("Node Type Distribution")]
+        [Tooltip("노드 타입별 생성 확률 (사용하지 않음 - 코드에서 직접 설정)")]
         [SerializeField] private List<NodeTypeDistribution> nodeTypeDistributions = new List<NodeTypeDistribution>();
         
         [Header("Special Placement Rules")]
-        [SerializeField] private int campFrequency = 3; // Camp appears at least every X nodes
-        [SerializeField] private bool placeShopOrCampBeforeBoss = true;
-        [SerializeField] private int maxConsecutiveBattles = 3;
+        [Tooltip("보스 전층에 캠프나 상점 포함 여부")]
+        [SerializeField] private bool placeShopOrCampBeforeBoss = true; // 보스 전층은 캠프/상점 포함
         
-        [Header("Scene Mapping")]
-        [SerializeField] private string battleSceneName = "Battle";
-        [SerializeField] private string eventSceneName = "Event";
-        [SerializeField] private string shopSceneName = "Shop";
-        [SerializeField] private string campSceneName = "Camp";
-        // [SerializeField] private string eliteSceneName = "Elite";
-        // [SerializeField] private string bossSceneName = "Boss";
+        [Tooltip("전투 노드 앞에 캠프 우선 배치 여부")]
+        [SerializeField] private bool placeCampBeforeBattle = true; // 전투 앞에 캠프 우선 배치
         
-        // The generated map
+        [Tooltip("상점이 배치되는 초반 층 수 (1부터 시작)")]
+        [SerializeField] private int shopEarlyLayerLimit = 3; // 상점은 초반 2~3층에 배치
+        
+        // 생성된 맵 데이터
         private List<MapNode> mapNodes = new List<MapNode>();
         private int nextNodeId = 0;
-        
-        // Current player position in the map
         private MapNode currentNode;
         
-        // Singleton instance
+        // 이벤트
+        public delegate void MapNodeSelectedHandler(MapNode node);
+        public event MapNodeSelectedHandler OnNodeSelected;
+        
+        // 씬 이름
+        private const string BATTLE_SCENE = "Battle";
+        private const string EVENT_SCENE = "Event";
+        private const string SHOP_SCENE = "Shop";
+        private const string CAMP_SCENE = "Camp";
+        private const string ELITE_SCENE = "Battle"; // 엘리트는 일반 전투 씬 사용
+        private const string BOSS_SCENE = "Boss";
+        private const string START_SCENE = "Battle"; // 시작은 일반 전투 씬 사용
         public static MapController Instance { get; private set; }
         
         private void Awake()
@@ -98,580 +138,340 @@ namespace MapSystem
         }
         
         private void Start()
-    {
-        // 지연된 초기화로 다른 컴포넌트가 준비될 시간 확보
-        Invoke("DelayedStart", 0.1f);
-    }
+        {
+            Invoke("DelayedStart", 0.1f);
+        }
 
-    private void DelayedStart()
-    {
-        GenerateMap();
-    }
+        private void DelayedStart()
+        {
+            GenerateMap();
+        }
         
         public void GenerateMap()
         {
             mapNodes.Clear();
             nextNodeId = 0;
             
-            // Create layers of the map
-            for (int layer = 0; layer < totalLayers; layer++)
+            // 맵 그리드 생성 (각 층별 노드 리스트)
+            List<List<MapNode>> layerGrid = new List<List<MapNode>>();
+            for (int i = 0; i < totalLayers; i++)
             {
-                GenerateLayer(layer);
+                layerGrid.Add(new List<MapNode>());
             }
             
-            // Ensure there's a path from start to end
-            EnsurePathFromStartToEnd();
+            // 1. 맨 아래(시작)에 Start 노드 추가
+            MapNode startNode = CreateNode(NodeType.Start, totalLayers - 1, 0);
+            startNode.position = new Vector2(0, (totalLayers - 1) * -1.5f); // 중앙 하단에 배치
+            layerGrid[totalLayers - 1].Add(startNode);
+            mapNodes.Add(startNode);
             
-            // Apply special placement rules
-            ApplySpecialPlacementRules();
+            // 2. 맨 위(끝)에 Boss 노드 추가
+            MapNode bossNode = CreateNode(NodeType.Boss, 0, 0);
+            bossNode.position = new Vector2(0, 0); // 중앙 상단에 배치
+            layerGrid[0].Add(bossNode);
+            mapNodes.Add(bossNode);
             
-            // Set the current node to the start node
-            currentNode = mapNodes.Find(node => node.nodeType == NodeType.Start);
+            // 3. 중간 층에 노드 분포
+            for (int layer = 1; layer < totalLayers - 1; layer++)
+            {
+                // 각 층에 몇 개의 노드를 생성할지 결정
+                int nodesInLayer = UnityEngine.Random.Range(minNodesPerLayer, maxNodesPerLayer + 1);
+                
+                // 노드 간 간격 설정
+                float spacing = 3.0f;
+                
+                for (int i = 0; i < nodesInLayer; i++)
+                {
+                    // 노드 타입 결정 (비율에 따라)
+                    NodeType nodeType = DetermineNodeType(layer);
+                    
+                    // 특수 규칙 적용
+                    // 보스 전층(layer==1)은 캠프나 상점 포함
+                    if (layer == 1 && placeShopOrCampBeforeBoss && i == 0)
+                    {
+                        nodeType = UnityEngine.Random.value < 0.5f ? NodeType.Camp : NodeType.Shop;
+                    }
+                    
+                    // 상점은 초반 2~3층에만 배치
+                    if (nodeType == NodeType.Shop && layer > totalLayers - shopEarlyLayerLimit)
+                    {
+                        nodeType = NodeType.Event; // 상점 대신 이벤트로 변경
+                    }
+                    
+                    MapNode node = CreateNode(nodeType, layer, i);
+                    
+                    // X 위치 분포 설정
+                    float xOffset = (i - (nodesInLayer - 1) / 2.0f) * spacing;
+                    node.position = new Vector2(xOffset, layer * -1.5f);
+                    
+                    layerGrid[layer].Add(node);
+                    mapNodes.Add(node);
+                }
+            }
             
-            // Debug log the map structure
+            // 4. 노드 간 연결 생성
+            for (int layer = 0; layer < totalLayers - 1; layer++)
+            {
+                ConnectNodesAtLayers(layerGrid[layer], layerGrid[layer + 1]);
+            }
+            
+            // 5. 특별 규칙 적용 - 전투 앞에 캠프 우선 배치
+            if (placeCampBeforeBattle)
+            {
+                EnsureCampBeforeBattle(layerGrid);
+            }
+            
+            // 6. 시작 노드를 현재 노드로 설정
+            currentNode = startNode;
+            startNode.isAccessible = true;
+            startNode.isCurrent = true;
+            
+            // 디버그 로그
             DebugLogMapStructure();
         }
         
-        private void GenerateLayer(int layerIndex)
+        // 노드 타입 결정 (비율에 따라)
+        private NodeType DetermineNodeType(int layer)
         {
-            int safetyCounter = 0;
-            int maxIterations = 1000; // 안전한 최대 반복 횟수
-
-            // Determine number of nodes for this layer
-            int nodesInLayer = UnityEngine.Random.Range(minNodesPerLayer, maxNodesPerLayer + 1);
+            // 노드 타입 비율: 전투 > 이벤트 > 캠프 > 상점 > 엘리트
+            float rand = UnityEngine.Random.value;
             
-            // Determine depth (number of steps) for this layer
-            int layerDepth = UnityEngine.Random.Range(minDepthPerLayer, maxDepthPerLayer + 1);
-            
-            // Create a grid to help with node placement
-            List<List<MapNode>> depthGrid = new List<List<MapNode>>();
-            for (int i = 0; i < layerDepth; i++)
-            {
-                depthGrid.Add(new List<MapNode>());
-            }
-            
-            // Special case for first and last layer
-            if (layerIndex == 0)
-            {
-                // Add start node at the first depth
-                MapNode startNode = CreateNode(NodeType.Start, layerIndex, 0);
-                depthGrid[0].Add(startNode);
-                mapNodes.Add(startNode);
-            }
-            
-            if (layerIndex == totalLayers - 1)
-            {
-                // Add boss node at the last depth
-                MapNode bossNode = CreateNode(NodeType.Boss, layerIndex, layerDepth - 1);
-                depthGrid[layerDepth - 1].Add(bossNode);
-                mapNodes.Add(bossNode);
-            }
-            
-            // Distribute remaining nodes across depths
-            int remainingNodes = nodesInLayer - (layerIndex == 0 ? 1 : 0) - (layerIndex == totalLayers - 1 ? 1 : 0);
-            
-            // Ensure we have at least one node at each depth level
-            for (int depth = 0; depth < layerDepth; depth++)
-            {
-                // Skip if we already added a special node (start/boss)
-                if ((layerIndex == 0 && depth == 0) || (layerIndex == totalLayers - 1 && depth == layerDepth - 1))
-                {
-                    continue;
-                }
-                
-                if (depthGrid[depth].Count == 0 && remainingNodes > 0)
-                {
-                    NodeType nodeType = GetRandomNodeType(layerIndex, depth, layerDepth);
-                    MapNode node = CreateNode(nodeType, layerIndex, depth);
-                    depthGrid[depth].Add(node);
-                    mapNodes.Add(node);
-                    remainingNodes--;
-                }
-            }
-            
-            // Distribute remaining nodes randomly but with more weight to middle depths
-            while (remainingNodes > 0 && safetyCounter < maxIterations)
-            {
-                safetyCounter++;
-
-                // Favor middle depths for more nodes
-                int depth = GetWeightedRandomDepth(layerDepth);
-                
-                // Skip if this is a special node position
-                if ((layerIndex == 0 && depth == 0) || (layerIndex == totalLayers - 1 && depth == layerDepth - 1))
-                {
-                    continue;
-                }
-                
-                NodeType nodeType = GetRandomNodeType(layerIndex, depth, layerDepth);
-                MapNode node = CreateNode(nodeType, layerIndex, depth);
-                depthGrid[depth].Add(node);
-                mapNodes.Add(node);
-                remainingNodes--;
-            }
-            
-            // Connect nodes between depths
-            for (int depth = 0; depth < layerDepth - 1; depth++)
-            {
-                ConnectNodesAtDepths(depthGrid[depth], depthGrid[depth + 1]);
-            }
+            if (rand < 0.45f) // 45% - 전투
+                return NodeType.Battle;
+            else if (rand < 0.70f) // 25% - 이벤트
+                return NodeType.Event;
+            else if (rand < 0.85f) // 15% - 캠프
+                return NodeType.Camp;
+            else if (rand < 0.95f) // 10% - 상점
+                return NodeType.Shop;
+            else // 5% - 엘리트
+                return NodeType.Elite;
         }
         
+        // 노드 생성
         private MapNode CreateNode(NodeType type, int layer, int depth)
         {
+            // 난이도와 보상 조정 - 경로에 따른 의미 부여
+            float diffMult = 1f + (depth * 0.1f); // 기본 난이도
+            float rewardMult = 1f + (depth * 0.1f); // 기본 보상
+            
+            // 노드 타입에 따른 난이도/보상 조정
+            switch (type)
+            {
+                case NodeType.Battle:
+                    // 기본 전투 - 표준 난이도와 보상
+                    break;
+                case NodeType.Event:
+                    // 이벤트 - 변동성 있음 (위험할 수도, 이득일 수도)
+                    diffMult *= UnityEngine.Random.Range(0.8f, 1.2f);
+                    rewardMult *= UnityEngine.Random.Range(0.8f, 1.5f);
+                    break;
+                case NodeType.Shop:
+                    // 상점 - 낮은 난이도, 자원 소모
+                    diffMult *= 0.5f;
+                    rewardMult *= 0.5f; // 상점은 보상이 아닌 자원 소모
+                    break;
+                case NodeType.Camp:
+                    // 캠프 - 매우 낮은 난이도, 회복 효과
+                    diffMult *= 0.2f;
+                    rewardMult *= 0.3f;
+                    break;
+                case NodeType.Elite:
+                    // 엘리트 - 높은 난이도, 높은 보상
+                    diffMult *= 1.5f;
+                    rewardMult *= 1.8f;
+                    break;
+                case NodeType.Boss:
+                    // 보스 - 매우 높은 난이도, 매우 높은 보상
+                    diffMult *= 2.0f;
+                    rewardMult *= 2.5f;
+                    break;
+            }
+            
             MapNode node = new MapNode
             {
                 id = nextNodeId++,
                 nodeType = type,
                 layer = layer,
                 depth = depth,
-                position = new Vector2(UnityEngine.Random.Range(-5f, 5f), depth * -1.5f), // Simple positioning
+                position = new Vector2(0, 0), // 기본 위치 (나중에 조정)
                 sceneName = GetSceneNameForNodeType(type),
-                difficultyMultiplier = 1f + (layer * 0.2f) + (depth * 0.05f), // Increase difficulty with depth and layer
-                rewardMultiplier = 1f + (layer * 0.2f) + (depth * 0.05f) // Same for rewards
+                difficultyMultiplier = diffMult,
+                rewardMultiplier = rewardMult
             };
             
             return node;
         }
         
+        // 노드 타입에 따른 씬 이름 반환
         private string GetSceneNameForNodeType(NodeType type)
         {
             switch (type)
             {
-                case NodeType.Battle: return battleSceneName;
-                case NodeType.Event: return eventSceneName;
-                case NodeType.Shop: return shopSceneName;
-                case NodeType.Camp: return campSceneName;
-                // case NodeType.Elite: return eliteSceneName;
-                // case NodeType.Boss: return bossSceneName;
-                case NodeType.Start: return battleSceneName; // Start node typically leads to a battle
-                default: return battleSceneName;
+                case NodeType.Battle: return BATTLE_SCENE;
+                case NodeType.Event: return EVENT_SCENE;
+                case NodeType.Shop: return SHOP_SCENE;
+                case NodeType.Camp: return CAMP_SCENE;
+                case NodeType.Elite: return ELITE_SCENE;
+                case NodeType.Boss: return BOSS_SCENE;
+                case NodeType.Start: return START_SCENE;
+                default: return BATTLE_SCENE;
             }
         }
         
-        private NodeType GetRandomNodeType(int layer, int depth, int maxDepth)
+        // 노드 연결 생성
+        private void ConnectNodesAtLayers(List<MapNode> upperNodes, List<MapNode> lowerNodes)
         {
-            // Special case for last node in last layer
-            if (layer == totalLayers - 1 && depth == maxDepth - 1)
+            // 각 노드는 다음 층의 1~2개 노드와 연결
+            foreach (MapNode upperNode in upperNodes)
             {
-                return NodeType.Boss;
-            }
-            
-            // Special case for first node in first layer
-            if (layer == 0 && depth == 0)
-            {
-                return NodeType.Start;
-            }
-            
-            // Higher chance of elite enemies in later depths
-            float eliteChance = Mathf.Lerp(0.05f, 0.3f, (float)depth / maxDepth);
-            if (UnityEngine.Random.value < eliteChance)
-            {
-                return NodeType.Elite;
-            }
-            
-            // Use the configured distribution for other node types
-            float rand = UnityEngine.Random.value * 100f;
-            float cumulativePercentage = 0f;
-            
-            foreach (var distribution in nodeTypeDistributions)
-            {
-                // Skip special node types that are placed by rules
-                if (distribution.nodeType == NodeType.Boss || 
-                    distribution.nodeType == NodeType.Start || 
-                    distribution.nodeType == NodeType.Elite)
-                {
-                    continue;
-                }
+                // 이 노드에서 만들 연결 수 결정 (1~2개)
+                int connectionsToMake = UnityEngine.Random.Range(minBranchesPerNode, maxBranchesPerNode + 1);
+                connectionsToMake = Mathf.Min(connectionsToMake, lowerNodes.Count); // 연결 가능한 노드 수 제한
                 
-                cumulativePercentage += distribution.percentage;
-                if (rand <= cumulativePercentage)
+                // 연결할 노드 선택 - 가까운 노드 우선 (X 위치 기준)
+                List<MapNode> potentialConnections = new List<MapNode>(lowerNodes);
+                potentialConnections.Sort((a, b) => 
+                    Mathf.Abs(a.position.x - upperNode.position.x).CompareTo(Mathf.Abs(b.position.x - upperNode.position.x)));
+                
+                // 선택된 수만큼 연결
+                for (int i = 0; i < connectionsToMake && i < potentialConnections.Count; i++)
                 {
-                    return distribution.nodeType;
+                    // 연결 추가
+                    upperNode.childNodeIds.Add(potentialConnections[i].id);
+                    potentialConnections[i].parentNodeIds.Add(upperNode.id);
                 }
             }
             
-            // Default to battle if something goes wrong
-            return NodeType.Battle;
-        }
-        
-        private int GetWeightedRandomDepth(int maxDepth)
-        {
-            // Create a bell curve distribution favoring middle depths
-            float[] weights = new float[maxDepth];
-            float totalWeight = 0f;
-            
-            for (int i = 0; i < maxDepth; i++)
+            // 모든 노드가 최소한 하나의 연결을 가지도록 확인
+            foreach (MapNode lowerNode in lowerNodes)
             {
-                // Distance from middle (0 to 1)
-                float distFromMiddle = Mathf.Abs(i - (maxDepth - 1) / 2f) / (maxDepth / 2f);
-                weights[i] = 1f - (distFromMiddle * 0.8f); // Higher weight for middle depths
-                totalWeight += weights[i];
-            }
-            
-            // Choose a depth based on weights
-            float random = UnityEngine.Random.value * totalWeight;
-            float cumulativeWeight = 0f;
-            
-            for (int i = 0; i < maxDepth; i++)
-            {
-                cumulativeWeight += weights[i];
-                if (random <= cumulativeWeight)
+                if (lowerNode.parentNodeIds.Count == 0 && upperNodes.Count > 0)
                 {
-                    return i;
-                }
-            }
-            
-            return maxDepth / 2; // Fallback to middle
-        }
-        
-        private void ConnectNodesAtDepths(List<MapNode> sourceNodes, List<MapNode> targetNodes)
-        {
-            if (sourceNodes.Count == 0 || targetNodes.Count == 0)
-            {
-                return;
-            }
-            
-            // Ensure every node has at least one connection
-            foreach (var sourceNode in sourceNodes)
-            {
-                // Determine number of branches for this node
-                int branches = UnityEngine.Random.Range(minBranchesPerNode, maxBranchesPerNode + 1);
-                branches = Mathf.Min(branches, targetNodes.Count); // Can't have more branches than target nodes
-                
-                // Create a list of possible target nodes
-                List<MapNode> possibleTargets = new List<MapNode>(targetNodes);
-                
-                // Connect to random targets
-                for (int i = 0; i < branches; i++)
-                {
-                    if (possibleTargets.Count == 0) break;
+                    // 가장 가까운 상위 노드 찾기
+                    upperNodes.Sort((a, b) => 
+                        Mathf.Abs(a.position.x - lowerNode.position.x).CompareTo(Mathf.Abs(b.position.x - lowerNode.position.x)));
                     
-                    // Select a random target
-                    int targetIndex = UnityEngine.Random.Range(0, possibleTargets.Count);
-                    MapNode targetNode = possibleTargets[targetIndex];
-                    
-                    // Connect nodes
-                    sourceNode.connectedNodesIds.Add(targetNode.id);
-                    
-                    // Remove target from possible targets to avoid duplicate connections
-                    possibleTargets.RemoveAt(targetIndex);
-                }
-            }
-            
-            // Ensure every target node has at least one incoming connection
-            foreach (var targetNode in targetNodes)
-            {
-                bool hasIncomingConnection = sourceNodes.Any(sourceNode => 
-                    sourceNode.connectedNodesIds.Contains(targetNode.id));
-                
-                if (!hasIncomingConnection && sourceNodes.Count > 0)
-                {
-                    // Connect a random source node to this target
-                    int sourceIndex = UnityEngine.Random.Range(0, sourceNodes.Count);
-                    sourceNodes[sourceIndex].connectedNodesIds.Add(targetNode.id);
+                    // 연결 추가
+                    upperNodes[0].childNodeIds.Add(lowerNode.id);
+                    lowerNode.parentNodeIds.Add(upperNodes[0].id);
                 }
             }
         }
         
-        private void EnsurePathFromStartToEnd()
+        // 전투 노드 앞에 캠프 우선 배치
+        private void EnsureCampBeforeBattle(List<List<MapNode>> layerGrid)
         {
-            // Find start and end nodes
-            MapNode startNode = mapNodes.Find(node => node.nodeType == NodeType.Start);
-            MapNode endNode = mapNodes.Find(node => node.nodeType == NodeType.Boss);
-            
-            if (startNode == null || endNode == null)
+            // 전투 노드 앞에 캠프 우선 배치 규칙 적용
+            for (int layer = 0; layer < totalLayers - 1; layer++)
             {
-                Debug.LogError("Start or end node not found!");
-                return;
-            }
-            
-            // Check if there's a path from start to end
-            if (!PathExistsBetweenNodes(startNode.id, endNode.id))
-            {
-                // Create a path by connecting nodes at each depth
-                MapNode currentNode = startNode;
-                
-                while (currentNode.id != endNode.id)
+                foreach (MapNode node in layerGrid[layer])
                 {
-                    // Find nodes at the next depth
-                    List<MapNode> nextDepthNodes = mapNodes.FindAll(node => 
-                        node.layer == currentNode.layer && node.depth == currentNode.depth + 1);
-                    
-                    // If no nodes at next depth in same layer, look for nodes in next layer
-                    if (nextDepthNodes.Count == 0 && currentNode.layer < totalLayers - 1)
+                    // 전투 노드인 경우 확인
+                    if (node.nodeType == NodeType.Battle)
                     {
-                        nextDepthNodes = mapNodes.FindAll(node => 
-                            node.layer == currentNode.layer + 1 && node.depth == 0);
-                    }
-                    
-                    if (nextDepthNodes.Count == 0)
-                    {
-                        Debug.LogError("Cannot create path to end node!");
-                        break;
-                    }
-                    
-                    // Find the closest node to the end node
-                    MapNode nextNode = nextDepthNodes.OrderBy(node => 
-                        Vector2.Distance(node.position, endNode.position)).First();
-                    
-                    // Connect current node to next node
-                    if (!currentNode.connectedNodesIds.Contains(nextNode.id))
-                    {
-                        currentNode.connectedNodesIds.Add(nextNode.id);
-                    }
-                    
-                    currentNode = nextNode;
-                }
-            }
-        }
-        
-        private bool PathExistsBetweenNodes(int startId, int endId)
-        {
-            // Simple BFS to check if a path exists
-            HashSet<int> visited = new HashSet<int>();
-            Queue<int> queue = new Queue<int>();
-            
-            queue.Enqueue(startId);
-            visited.Add(startId);
-            
-            while (queue.Count > 0)
-            {
-                int currentId = queue.Dequeue();
-                
-                if (currentId == endId)
-                {
-                    return true;
-                }
-                
-                MapNode currentNode = mapNodes.Find(node => node.id == currentId);
-                if (currentNode != null)
-                {
-                    foreach (int connectedId in currentNode.connectedNodesIds)
-                    {
-                        if (!visited.Contains(connectedId))
-                        {
-                            visited.Add(connectedId);
-                            queue.Enqueue(connectedId);
-                        }
-                    }
-                }
-            }
-            
-            return false;
-        }
-        
-        private void ApplySpecialPlacementRules()
-        {
-            // Ensure camp nodes appear regularly
-            EnsureRegularCampNodes();
-            
-            // Ensure shop or camp before boss
-            EnsureShopOrCampBeforeBoss();
-            
-            // Prevent too many consecutive battles
-            PreventConsecutiveBattles();
-            
-            // Ensure proper difficulty progression
-            AdjustDifficultyProgression();
-        }
-        
-        private void EnsureRegularCampNodes()
-        {
-            // Group nodes by layer
-            for (int layer = 0; layer < totalLayers; layer++)
-            {
-                List<MapNode> layerNodes = mapNodes.FindAll(node => node.layer == layer);
-                
-                // Sort by depth
-                layerNodes.Sort((a, b) => a.depth.CompareTo(b.depth));
-                
-                // Check for camp frequency
-                int nodesSinceCamp = 0;
-                
-                for (int i = 0; i < layerNodes.Count; i++)
-                {
-                    if (layerNodes[i].nodeType == NodeType.Camp)
-                    {
-                        nodesSinceCamp = 0;
-                    }
-                    else
-                    {
-                        nodesSinceCamp++;
+                        bool hasCampConnection = false;
                         
-                        // If we've gone too long without a camp and this isn't a special node
-                        if (nodesSinceCamp >= campFrequency && 
-                            layerNodes[i].nodeType != NodeType.Boss && 
-                            layerNodes[i].nodeType != NodeType.Start)
+                        // 이 전투 노드로 연결된 모든 노드 확인
+                        foreach (int parentId in node.parentNodeIds)
                         {
-                            layerNodes[i].nodeType = NodeType.Camp;
-                            layerNodes[i].sceneName = campSceneName;
-                            nodesSinceCamp = 0;
-                        }
-                    }
-                }
-            }
-        }
-        
-        private void EnsureShopOrCampBeforeBoss()
-        {
-            if (!placeShopOrCampBeforeBoss) return;
-            
-            MapNode bossNode = mapNodes.Find(node => node.nodeType == NodeType.Boss);
-            if (bossNode == null) return;
-            
-            // Find all nodes that connect directly to the boss
-            List<MapNode> nodesThatConnectToBoss = mapNodes.FindAll(node => 
-                node.connectedNodesIds.Contains(bossNode.id));
-            
-            // Ensure at least one is a shop or camp
-            bool hasShopOrCamp = nodesThatConnectToBoss.Any(node => 
-                node.nodeType == NodeType.Shop || node.nodeType == NodeType.Camp);
-            
-            if (!hasShopOrCamp && nodesThatConnectToBoss.Count > 0)
-            {
-                // Convert one random node to shop or camp
-                MapNode nodeToConvert = nodesThatConnectToBoss[UnityEngine.Random.Range(0, nodesThatConnectToBoss.Count)];
-                nodeToConvert.nodeType = UnityEngine.Random.value < 0.5f ? NodeType.Shop : NodeType.Camp;
-                nodeToConvert.sceneName = nodeToConvert.nodeType == NodeType.Shop ? shopSceneName : campSceneName;
-            }
-        }
-        
-        private void PreventConsecutiveBattles()
-        {
-            // Group nodes by layer
-            for (int layer = 0; layer < totalLayers; layer++)
-            {
-                List<MapNode> layerNodes = mapNodes.FindAll(node => node.layer == layer);
-                
-                // Sort by depth
-                layerNodes.Sort((a, b) => a.depth.CompareTo(b.depth));
-                
-                // Check for consecutive battles
-                int consecutiveBattles = 0;
-                
-                for (int i = 0; i < layerNodes.Count; i++)
-                {
-                    if (layerNodes[i].nodeType == NodeType.Battle || layerNodes[i].nodeType == NodeType.Elite)
-                    {
-                        consecutiveBattles++;
-                        
-                        // If too many consecutive battles
-                        if (consecutiveBattles > maxConsecutiveBattles && i < layerNodes.Count - 1)
-                        {
-                            // Convert next battle to an event or shop
-                            for (int j = i + 1; j < layerNodes.Count; j++)
+                            MapNode parentNode = mapNodes.Find(n => n.id == parentId);
+                            if (parentNode != null && parentNode.nodeType == NodeType.Camp)
                             {
-                                if (layerNodes[j].nodeType == NodeType.Battle && 
-                                    layerNodes[j].nodeType != NodeType.Boss && 
-                                    layerNodes[j].nodeType != NodeType.Start)
+                                hasCampConnection = true;
+                                break;
+                            }
+                        }
+                        
+                        // 캠프가 없고 부모 노드가 있으면 하나를 캠프로 변경
+                        if (!hasCampConnection && node.parentNodeIds.Count > 0)
+                        {
+                            // 부모 노드 중 하나를 무작위로 선택하여 캠프로 변경
+                            // 단, 이미 특수 노드(상점, 엘리트, 보스)가 아닌 경우에만
+                            List<MapNode> eligibleParents = new List<MapNode>();
+                            
+                            foreach (int parentId in node.parentNodeIds)
+                            {
+                                MapNode parent = mapNodes.Find(n => n.id == parentId);
+                                if (parent != null && 
+                                    parent.nodeType != NodeType.Shop && 
+                                    parent.nodeType != NodeType.Elite && 
+                                    parent.nodeType != NodeType.Boss)
                                 {
-                                    layerNodes[j].nodeType = UnityEngine.Random.value < 0.7f ? NodeType.Event : NodeType.Shop;
-                                    layerNodes[j].sceneName = layerNodes[j].nodeType == NodeType.Event ? eventSceneName : shopSceneName;
-                                    consecutiveBattles = 0;
-                                    break;
+                                    eligibleParents.Add(parent);
                                 }
+                            }
+                            
+                            if (eligibleParents.Count > 0)
+                            {
+                                MapNode nodeToChange = eligibleParents[UnityEngine.Random.Range(0, eligibleParents.Count)];
+                                nodeToChange.nodeType = NodeType.Camp;
+                                nodeToChange.sceneName = CAMP_SCENE;
                             }
                         }
                     }
-                    else
-                    {
-                        consecutiveBattles = 0;
-                    }
                 }
             }
         }
         
-        private void AdjustDifficultyProgression()
-        {
-            // Adjust difficulty based on depth and layer
-            foreach (var node in mapNodes)
-            {
-                // Base difficulty increases with layer and depth
-                float baseDifficulty = 1f + (node.layer * 0.3f) + (node.depth * 0.1f);
-                
-                // Additional difficulty for elite and boss nodes
-                if (node.nodeType == NodeType.Elite)
-                {
-                    baseDifficulty *= 1.5f;
-                }
-                else if (node.nodeType == NodeType.Boss)
-                {
-                    baseDifficulty *= 2f;
-                }
-                
-                // Add some randomness
-                float randomVariance = UnityEngine.Random.Range(-0.1f, 0.1f);
-                
-                node.difficultyMultiplier = baseDifficulty + randomVariance;
-                
-                // Rewards scale with difficulty
-                node.rewardMultiplier = node.difficultyMultiplier;
-            }
-        }
-        
-        public void TravelToNode(int nodeId)
-        {
-            MapNode targetNode = mapNodes.Find(node => node.id == nodeId);
-            
-            if (targetNode == null)
-            {
-                Debug.LogError("Target node not found!");
-                return;
-            }
-            
-            // Check if this node is accessible from current node
-            if (currentNode != null && !currentNode.connectedNodesIds.Contains(nodeId))
-            {
-                Debug.LogError("Cannot travel to this node - not connected!");
-                return;
-            }
-            
-            // Set as current node
-            currentNode = targetNode;
-            
-            // Load the appropriate scene
-            SceneManager.LoadScene(targetNode.sceneName);
-        }
-        
-        public List<MapNode> GetAccessibleNodes()
-        {
-            if (currentNode == null) return new List<MapNode>();
-            
-            List<MapNode> accessibleNodes = new List<MapNode>();
-            
-            foreach (int nodeId in currentNode.connectedNodesIds)
-            {
-                MapNode node = mapNodes.Find(n => n.id == nodeId);
-                if (node != null)
-                {
-                    accessibleNodes.Add(node);
-                }
-            }
-            
-            return accessibleNodes;
-        }
-        
-        public MapNode GetCurrentNode()
-        {
-            return currentNode;
-        }
-        
-        public List<MapNode> GetAllNodes()
-        {
-            return new List<MapNode>(mapNodes);
-        }
-        
+        // 디버그용 맵 구조 로그 출력
         private void DebugLogMapStructure()
         {
             Debug.Log($"Generated map with {mapNodes.Count} nodes across {totalLayers} layers");
             
             foreach (var node in mapNodes)
             {
-                string connections = string.Join(", ", node.connectedNodesIds);
+                string connections = string.Join(", ", node.childNodeIds);
                 Debug.Log($"Node {node.id} (Type: {node.nodeType}, Layer: {node.layer}, Depth: {node.depth}) " +
                           $"connects to: [{connections}]");
             }
+        }
+        
+        public void SelectNode(int nodeId)
+        {
+            MapNode selectedNode = mapNodes.Find(node => node.id == nodeId);
+            if (selectedNode != null && selectedNode.isAccessible)
+            {
+                // Update current node
+                if (currentNode != null)
+                {
+                    currentNode.isCurrent = false;
+                    currentNode.isCompleted = true;
+                }
+                
+                currentNode = selectedNode;
+                currentNode.isCurrent = true;
+                
+                // Update accessible nodes
+                UpdateAccessibleNodes();
+                
+                // Trigger event
+                OnNodeSelected?.Invoke(currentNode);
+            }
+        }
+        
+        private void UpdateAccessibleNodes()
+        {
+            // Reset all nodes to inaccessible
+            foreach (var node in mapNodes)
+            {
+                node.isAccessible = false;
+            }
+            
+            // Mark nodes connected to current node as accessible
+            foreach (int nodeId in currentNode.childNodeIds)
+            {
+                MapNode node = mapNodes.Find(n => n.id == nodeId);
+                if (node != null)
+                {
+                    node.isAccessible = true;
+                }
+            }
+        }
+        
+        public List<MapNode> GetAllNodes()
+        {
+            return new List<MapNode>(mapNodes);
         }
     }
 }

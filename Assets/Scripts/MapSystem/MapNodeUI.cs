@@ -142,6 +142,9 @@ namespace MapSystem
             RectTransform connectionRect = connectionObj.GetComponent<RectTransform>();
             connections.Add(connectionRect);
             
+            // 연결선을 계층 구조에서 가장 처음에 배치하여 다른 UI 요소보다 뒤에 표시되도록 함
+            connectionObj.transform.SetAsFirstSibling();
+            
             // Get positions in local space
             Vector2 startPos = Vector2.zero; // Local space, so this node is at origin
             Vector2 endPos = targetNode.GetComponent<RectTransform>().anchoredPosition - GetComponent<RectTransform>().anchoredPosition;
@@ -190,8 +193,8 @@ namespace MapSystem
         {
             if (isAccessible)
             {
-                // Travel to this node
-                MapController.Instance.TravelToNode(nodeData.id);
+                // Select this node
+                MapController.Instance.SelectNode(nodeData.id);
             }
         }
         

@@ -58,6 +58,11 @@ namespace MapSystem
             // Initialize the map UI
             Invoke("InitializeMapUI", 0.3f);
         }
+
+        void Update()
+        {
+            ToggleMapUI();
+        }
         
         public void InitializeMapUI()
         {
@@ -126,8 +131,8 @@ namespace MapSystem
         {
             // Calculate position based on node's layer and depth
             float x = node.position.x * nodeSpacingX;
-            float y = -node.depth * nodeSpacingY - node.layer * layerSpacingY;
-            
+            float y = (-node.depth * nodeSpacingY - node.layer * layerSpacingY);
+        
             return new Vector2(x, y);
         }
         
@@ -141,7 +146,7 @@ namespace MapSystem
                     sourceNodeUI.ClearConnections();
                     
                     // Create connections to all connected nodes
-                    foreach (int connectedId in node.connectedNodesIds)
+                    foreach (int connectedId in node.childNodeIds)
                     {
                         if (nodeUIElements.TryGetValue(connectedId, out MapNodeUI targetNodeUI))
                         {
@@ -154,21 +159,22 @@ namespace MapSystem
         
         public void UpdateNodeAccessibility()
         {
-            // Get current node and accessible nodes from controller
-            MapNode currentNode = mapController.GetCurrentNode();
-            List<MapNode> accessibleNodes = mapController.GetAccessibleNodes();
+            // Get all nodes from controller
+            List<MapNode> allNodes = mapController.GetAllNodes();
             
             // Update all nodes
             foreach (var nodeUI in nodeUIElements.Values)
             {
                 MapNode nodeData = nodeUI.GetNodeData();
                 
-                // Check if this node is the current node or accessible
-                bool isCurrentNode = (currentNode != null && nodeData.id == currentNode.id);
-                bool isAccessible = isCurrentNode || accessibleNodes.Exists(n => n.id == nodeData.id);
+                // Find the corresponding node in the controller's data
+                MapNode controllerNode = allNodes.Find(n => n.id == nodeData.id);
                 
-                // Update node UI
-                nodeUI.UpdateAccessibility(isAccessible);
+                if (controllerNode != null)
+                {
+                    // Update node UI based on the node's accessibility in the controller
+                    nodeUI.UpdateAccessibility(controllerNode.isAccessible || controllerNode.isCurrent);
+                }
             }
         }
         
@@ -260,6 +266,20 @@ namespace MapSystem
         public void RefreshMap()
         {
             UpdateNodeAccessibility();
+        }
+
+        public void ToggleMapUI()
+        {
+            if(Input.GetKeyDown(KeyCode.M))
+            {
+                Debug.Log("맵 열기");
+                mapContainer.gameObject.SetActive(!mapContainer.gameObject.activeSelf);
+            }
+            else if(Input.GetKeyDown(KeyCode.Escape))
+            {
+                Debug.Log("맵 닫기");
+                mapContainer.gameObject.SetActive(false);
+            }
         }
     }
 }
