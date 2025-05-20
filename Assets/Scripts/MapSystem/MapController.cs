@@ -9,22 +9,10 @@ namespace MapSystem
     {
         Start,
         Battle,
-        Event,
         Shop,
         Camp,
         Elite,
         Boss
-    }
-    
-    [System.Serializable]
-    public class NodeTypeDistribution
-    {
-        [Tooltip("노드 타입")]
-        public NodeType nodeType;
-        
-        [Tooltip("생성 확률 (%)")]
-        [Range(0, 100)]
-        public float percentage;
     }
     
     [System.Serializable]
@@ -91,10 +79,6 @@ namespace MapSystem
         [Tooltip("각 노드가 다음 층에 연결할 최대 노드 수")]
         [SerializeField] private int maxBranchesPerNode = 2; // 다음 층의 최대 2개와 연결
         
-        [Header("Node Type Distribution")]
-        [Tooltip("노드 타입별 생성 확률 (사용하지 않음 - 코드에서 직접 설정)")]
-        [SerializeField] private List<NodeTypeDistribution> nodeTypeDistributions = new List<NodeTypeDistribution>();
-        
         [Header("Special Placement Rules")]
         [Tooltip("보스 전층에 캠프나 상점 포함 여부")]
         [SerializeField] private bool placeShopOrCampBeforeBoss = true; // 보스 전층은 캠프/상점 포함
@@ -104,6 +88,14 @@ namespace MapSystem
         
         [Tooltip("상점이 배치되는 초반 층 수 (1부터 시작)")]
         [SerializeField] private int shopEarlyLayerLimit = 3; // 상점은 초반 2~3층에 배치
+        
+        // 노드 타입 결정 (비율에 따라)
+        [Header("맵 타입 별 생성 비율")]
+        [SerializeField] private float battleProbability = 0.6f;
+        [SerializeField] private float campProbability = 0.2f;
+        [SerializeField] private float shopProbability = 0.1f;
+        [SerializeField] private float eliteProbability = 0.1f;
+
         
         // 생성된 맵 데이터
         private List<MapNode> mapNodes = new List<MapNode>();
@@ -195,7 +187,7 @@ namespace MapSystem
                     // 상점은 초반 2~3층에만 배치
                     if (nodeType == NodeType.Shop && layer > totalLayers - shopEarlyLayerLimit)
                     {
-                        nodeType = NodeType.Event; // 상점 대신 이벤트로 변경
+                        nodeType = NodeType.Camp; // 상점 대신 캠프로 변경
                     }
                     
                     MapNode node = CreateNode(nodeType, layer, i);
@@ -230,21 +222,18 @@ namespace MapSystem
             DebugLogMapStructure();
         }
         
-        // 노드 타입 결정 (비율에 따라)
         private NodeType DetermineNodeType(int layer)
         {
-            // 노드 타입 비율: 전투 > 이벤트 > 캠프 > 상점 > 엘리트
+            // 노드 타입 비율: 전투 > 캠프 > 상점 > 엘리트
             float rand = UnityEngine.Random.value;
-            
-            if (rand < 0.45f) // 45% - 전투
+
+            if (rand < battleProbability) // 전투
                 return NodeType.Battle;
-            else if (rand < 0.70f) // 25% - 이벤트
-                return NodeType.Event;
-            else if (rand < 0.85f) // 15% - 캠프
+            else if (rand < battleProbability + campProbability) // 캠프
                 return NodeType.Camp;
-            else if (rand < 0.95f) // 10% - 상점
+            else if (rand < battleProbability + campProbability + shopProbability) // 상점
                 return NodeType.Shop;
-            else // 5% - 엘리트
+            else // 엘리트
                 return NodeType.Elite;
         }
         
@@ -260,11 +249,6 @@ namespace MapSystem
             {
                 case NodeType.Battle:
                     // 기본 전투 - 표준 난이도와 보상
-                    break;
-                case NodeType.Event:
-                    // 이벤트 - 변동성 있음 (위험할 수도, 이득일 수도)
-                    diffMult *= UnityEngine.Random.Range(0.8f, 1.2f);
-                    rewardMult *= UnityEngine.Random.Range(0.8f, 1.5f);
                     break;
                 case NodeType.Shop:
                     // 상점 - 낮은 난이도, 자원 소모
@@ -309,7 +293,6 @@ namespace MapSystem
             switch (type)
             {
                 case NodeType.Battle: return BATTLE_SCENE;
-                case NodeType.Event: return EVENT_SCENE;
                 case NodeType.Shop: return SHOP_SCENE;
                 case NodeType.Camp: return CAMP_SCENE;
                 case NodeType.Elite: return ELITE_SCENE;

@@ -27,7 +27,6 @@ namespace MapSystem
         
         [Header("Node Colors")]
         [SerializeField] private Color battleColor = Color.red;
-        [SerializeField] private Color eventColor = Color.blue;
         [SerializeField] private Color shopColor = Color.green;
         [SerializeField] private Color campColor = Color.yellow;
         [SerializeField] private Color eliteColor = new Color(0.8f, 0.2f, 0.8f); // Purple
@@ -93,7 +92,6 @@ namespace MapSystem
             switch (type)
             {
                 case NodeType.Battle: return battleSprite;
-                case NodeType.Event: return eventSprite;
                 case NodeType.Shop: return shopSprite;
                 case NodeType.Camp: return campSprite;
                 case NodeType.Elite: return eliteSprite;
@@ -108,7 +106,6 @@ namespace MapSystem
             switch (type)
             {
                 case NodeType.Battle: return battleColor;
-                case NodeType.Event: return eventColor;
                 case NodeType.Shop: return shopColor;
                 case NodeType.Camp: return campColor;
                 case NodeType.Elite: return eliteColor;
@@ -123,7 +120,6 @@ namespace MapSystem
             switch (nodeData.nodeType)
             {
                 case NodeType.Battle: return "전투";
-                case NodeType.Event: return "이벤트";
                 case NodeType.Shop: return "상점";
                 case NodeType.Camp: return "캠프";
                 case NodeType.Elite: return "엘리트";

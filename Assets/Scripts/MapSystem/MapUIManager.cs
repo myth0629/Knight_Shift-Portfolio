@@ -208,7 +208,6 @@ namespace MapSystem
             switch (type)
             {
                 case NodeType.Battle: return "전투";
-                case NodeType.Event: return "이벤트";
                 case NodeType.Shop: return "상점";
                 case NodeType.Camp: return "캠프";
                 case NodeType.Elite: return "엘리트 전투";
@@ -228,10 +227,6 @@ namespace MapSystem
                     description = "일반 적과의 전투입니다.\n";
                     description += $"난이도: {node.difficultyMultiplier:F1}x\n";
                     description += $"보상: {node.rewardMultiplier:F1}x";
-                    break;
-                case NodeType.Event:
-                    description = "랜덤 이벤트가 발생합니다.\n";
-                    description += "행운이 따른다면 좋은 보상을 얻을 수 있습니다.";
                     break;
                 case NodeType.Shop:
                     description = "상점에서 아이템을 구매할 수 있습니다.\n";
