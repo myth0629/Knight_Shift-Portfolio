@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using UnityEngine.SceneManagement;
 
 namespace MapSystem
 {
@@ -111,9 +112,8 @@ namespace MapSystem
         private const string EVENT_SCENE = "Event";
         private const string SHOP_SCENE = "Shop";
         private const string CAMP_SCENE = "Camp";
-        private const string ELITE_SCENE = "Battle"; // 엘리트는 일반 전투 씬 사용
         private const string BOSS_SCENE = "Boss";
-        private const string START_SCENE = "Battle"; // 시작은 일반 전투 씬 사용
+        private const string START_SCENE = "Start"; // 시작은 일반 전투 씬 사용
         public static MapController Instance { get; private set; }
         
         private void Awake()
@@ -126,12 +126,59 @@ namespace MapSystem
             }
             
             Instance = this;
+            
+            // 씬 전환 시에도 유지
             DontDestroyOnLoad(gameObject);
+            
+            // 씬 로드 이벤트 등록
+            SceneManager.sceneLoaded += OnSceneLoaded;
         }
         
         private void Start()
         {
             Invoke("DelayedStart", 0.1f);
+        }
+        
+        // 씬 로드 이벤트 핸들러
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            Debug.Log($"씬 로드됨: {scene.name}, 모드: {mode}");
+            
+            // 씬 전환 후 맵 UI 새로 초기화
+            if (MapUIManager.Instance != null)
+            {
+                // 약간의 지연 후 맵 UI 초기화 (씬 로드 완료 후)
+                Invoke("RefreshMapAfterSceneLoad", 0.5f);
+            }
+        }
+        
+        // 씬 로드 후 맵 새로고침
+        private void RefreshMapAfterSceneLoad()
+        {
+            // 저장된 현재 노드 ID 가져오기
+            int savedNodeId = PlayerPrefs.GetInt("CurrentNodeID", -1);
+            Debug.Log($"저장된 노드 ID: {savedNodeId}");
+            
+            // 저장된 노드 ID가 있으면 현재 노드 복원
+            if (savedNodeId >= 0)
+            {
+                MapNode savedNode = mapNodes.Find(n => n.id == savedNodeId);
+                if (savedNode != null)
+                {
+                    Debug.Log($"현재 노드 복원: {savedNode.id}, 타입: {savedNode.nodeType}");
+                    currentNode = savedNode;
+                    currentNode.isCurrent = true;
+                }
+            }
+            
+            // 맵 UI 초기화
+            MapUIManager.Instance.InitializeMapUI();
+            
+            // 현재 노드에 연결된 노드들 접근 가능하게 설정
+            UpdateAccessibleNodes();
+            
+            // 맵 UI 새로고침
+            MapUIManager.Instance.RefreshMap();
         }
 
         private void DelayedStart()
@@ -295,7 +342,6 @@ namespace MapSystem
                 case NodeType.Battle: return BATTLE_SCENE;
                 case NodeType.Shop: return SHOP_SCENE;
                 case NodeType.Camp: return CAMP_SCENE;
-                case NodeType.Elite: return ELITE_SCENE;
                 case NodeType.Boss: return BOSS_SCENE;
                 case NodeType.Start: return START_SCENE;
                 default: return BATTLE_SCENE;

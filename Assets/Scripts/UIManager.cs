@@ -11,10 +11,10 @@ public class UIManager : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            ToggleUIPanel();
-        }
+        // if (Input.GetKeyDown(KeyCode.E))
+        // {
+        //     ToggleUIPanel();
+        // }
     }
 
     public void ToggleUIPanel()
