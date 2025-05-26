@@ -210,7 +210,6 @@ namespace MapSystem
                 case NodeType.Battle: return "전투";
                 case NodeType.Shop: return "상점";
                 case NodeType.Camp: return "캠프";
-                case NodeType.Elite: return "엘리트 전투";
                 case NodeType.Boss: return "보스 전투";
                 case NodeType.Start: return "시작";
                 default: return "";
@@ -235,11 +234,6 @@ namespace MapSystem
                 case NodeType.Camp:
                     description = "휴식을 취하고 체력을 회복할 수 있는 캠프입니다.\n";
                     description += "HP를 회복하고 버프를 받을 수 있습니다.";
-                    break;
-                case NodeType.Elite:
-                    description = "강력한 엘리트 적과의 전투입니다.\n";
-                    description += $"난이도: {node.difficultyMultiplier:F1}x\n";
-                    description += $"보상: {node.rewardMultiplier:F1}x";
                     break;
                 case NodeType.Boss:
                     description = "최종 보스와의 전투입니다.\n";
@@ -267,12 +261,10 @@ namespace MapSystem
         {
             if(Input.GetKeyDown(KeyCode.M))
             {
-                Debug.Log("맵 열기");
                 mapContainer.gameObject.SetActive(!mapContainer.gameObject.activeSelf);
             }
             else if(Input.GetKeyDown(KeyCode.Escape))
             {
-                Debug.Log("맵 닫기");
                 mapContainer.gameObject.SetActive(false);
             }
         }

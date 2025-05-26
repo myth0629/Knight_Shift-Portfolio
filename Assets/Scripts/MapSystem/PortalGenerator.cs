@@ -9,13 +9,11 @@ public class PortalGenerator : MonoBehaviour
     [SerializeField] private GameObject battlePortalPrefab;
     [SerializeField] private GameObject shopPortalPrefab;
     [SerializeField] private GameObject campPortalPrefab;
-    [SerializeField] private GameObject elitePortalPrefab;
     [SerializeField] private GameObject bossPortalPrefab;
 
     [Header("Portal Placement")]
     [SerializeField] private Transform portalParent;
     [SerializeField] private float portalSpacingX = 3f;
-    [SerializeField] private float portalSpacingZ = 3f;
     [SerializeField] private Vector3 startPosition = new Vector3(0, 0, 0);
 
     private Dictionary<int, GameObject> spawnedPortals = new Dictionary<int, GameObject>();
@@ -23,6 +21,10 @@ public class PortalGenerator : MonoBehaviour
 
     private void Start()
     {
+        MapController.Instance.OnNodeSelected += HandleNodeSelected;
+        // 초기 포탈 생성도 여기서
+        HandleNodeSelected(MapController.Instance.GetAllNodes().Find(n => n.isCurrent));
+        
         mapController = MapController.Instance;
         if (mapController == null)
         {
@@ -36,59 +38,64 @@ public class PortalGenerator : MonoBehaviour
         // 1초 후에 포털 생성 (맵이 먼저 초기화되도록)
         Invoke("GeneratePortals", 1f);
     }
+    
+    private void HandleNodeSelected(MapNode node)
+    {
+        // 포탈 전부 삭제
+        ClearPortals();
+        // 현재 노드의 childNodeIds 기준으로 새 포탈 생성
+        var allNodes = MapController.Instance.GetAllNodes();
+        foreach (int childId in node.childNodeIds)
+        {
+            MapNode childNode = allNodes.Find(n => n.id == childId);
+            if (childNode != null)
+                CreatePortalForNode(childNode, childNode.position);
+        }
+    }
 
     public void GeneratePortals()
     {
-        // 기존 포털 제거
         ClearPortals();
-        
-        // 맵 노드 가져오기
+
         List<MapNode> allNodes = mapController.GetAllNodes();
         
-        // 각 층별로 노드 구분
-        Dictionary<int, List<MapNode>> nodesByLayer = new Dictionary<int, List<MapNode>>();
-        foreach (var node in allNodes)
+        MapNode currentNode = allNodes.Find(n => n.isCurrent);
+        if (currentNode == null)
         {
-            if (!nodesByLayer.ContainsKey(node.layer))
-            {
-                nodesByLayer[node.layer] = new List<MapNode>();
-            }
-            nodesByLayer[node.layer].Add(node);
+            Debug.LogWarning("No current node found.");
+            return;
         }
-        
-        // 각 층별로 포털 생성
-        foreach (var layerPair in nodesByLayer)
+
+        List<MapNode> nodesToSpawn = new List<MapNode>();
+
+        foreach (int childId in currentNode.childNodeIds)
         {
-            int layer = layerPair.Key;
-            List<MapNode> nodesInLayer = layerPair.Value;
-            
-            // 층별 배치를 위해 Z 좌표 계산
-            float zPos = startPosition.z + (layer * portalSpacingZ);
-            
-            // 각 층의 노드 수에 따라 X 위치 조절
-            int nodeCount = nodesInLayer.Count;
-            float startX = startPosition.x - ((nodeCount - 1) * portalSpacingX / 2f);
-            
-            // 각 노드에 대한 포털 생성
-            for (int i = 0; i < nodesInLayer.Count; i++)
+            MapNode childNode = allNodes.Find(n => n.id == childId);
+            if (childNode != null)
             {
-                MapNode node = nodesInLayer[i];
-                float xPos = startX + (i * portalSpacingX);
-                
-                // 포털 생성
-                CreatePortalForNode(node, new Vector3(xPos, startPosition.y, zPos));
+                nodesToSpawn.Add(childNode);
             }
         }
-        
-        // 접근 가능한 포털만 활성화
+
+        float startX = startPosition.x - ((nodesToSpawn.Count - 1) * portalSpacingX / 2f);
+        float zPos = startPosition.z + 10f;
+            
+        Debug.Log($"currentNode: {currentNode.id}, 자식 개수: {currentNode.childNodeIds.Count}");
+        Debug.Log($"생성할 포탈 개수: {nodesToSpawn.Count}");
+
+        for (int i = 0; i < nodesToSpawn.Count; i++)
+        {
+            MapNode node = nodesToSpawn[i];
+            float xPos = startX + (i * portalSpacingX);
+            CreatePortalForNode(node, new Vector3(xPos, startPosition.y, zPos));
+        }
+
         UpdatePortalAccessibility();
-        
-        // 연결선 생성
-        CreatePortalConnections(allNodes);
     }
     
     private void CreatePortalForNode(MapNode node, Vector3 position)
     {
+        Debug.Log($"Creating portal for node: {node.id} at position: {position}");
         // 노드 타입별 포털 프리팹 선택
         GameObject prefab = GetPrefabForNodeType(node.nodeType);
         if (prefab == null) return;
@@ -115,49 +122,11 @@ public class PortalGenerator : MonoBehaviour
             case NodeType.Battle: return battlePortalPrefab;
             case NodeType.Shop: return shopPortalPrefab;
             case NodeType.Camp: return campPortalPrefab;
-            case NodeType.Elite: return elitePortalPrefab;
             case NodeType.Boss: return bossPortalPrefab;
-            case NodeType.Start: return battlePortalPrefab; // 시작 노드는 전투 포털 사용
-            default: return battlePortalPrefab;
+            default: 
+                Debug.LogWarning($"No portal prefab defined for node type: {type}");
+                return null; // 기본 예비 프리팹은 사용하지 않음
         }
-    }
-    
-    private void CreatePortalConnections(List<MapNode> allNodes)
-    {
-        // 각 노드 연결에 대해 시각적 연결선 생성
-        foreach (var node in allNodes)
-        {
-            if (!spawnedPortals.ContainsKey(node.id)) continue;
-            
-            GameObject sourcePortal = spawnedPortals[node.id];
-            
-            foreach (int childId in node.childNodeIds)
-            {
-                if (spawnedPortals.ContainsKey(childId))
-                {
-                    GameObject targetPortal = spawnedPortals[childId];
-                    CreateConnectionLine(sourcePortal.transform.position, targetPortal.transform.position);
-                }
-            }
-        }
-    }
-    
-    private void CreateConnectionLine(Vector3 start, Vector3 end)
-    {
-        // 라인 렌더러로 연결선 생성
-        GameObject lineObj = new GameObject("ConnectionLine");
-        lineObj.transform.SetParent(portalParent);
-        
-        LineRenderer line = lineObj.AddComponent<LineRenderer>();
-        line.positionCount = 2;
-        line.SetPosition(0, start + Vector3.up * 0.1f); // 약간 위로 올려서 바닥과 겹치지 않게
-        line.SetPosition(1, end + Vector3.up * 0.1f);
-        
-        line.startWidth = 0.05f;
-        line.endWidth = 0.05f;
-        line.material = new Material(Shader.Find("Sprites/Default"));
-        line.startColor = new Color(0.8f, 0.8f, 0.8f, 0.5f);
-        line.endColor = new Color(0.8f, 0.8f, 0.8f, 0.5f);
     }
     
     public void OnNodeSelected(MapNode node)
@@ -205,15 +174,7 @@ public class PortalGenerator : MonoBehaviour
                 Destroy(portal);
             }
         }
-        
         spawnedPortals.Clear();
-        
-        // 연결선 제거
-        LineRenderer[] lines = portalParent.GetComponentsInChildren<LineRenderer>();
-        foreach (var line in lines)
-        {
-            Destroy(line.gameObject);
-        }
     }
     
     public void OnPortalClicked(int nodeId)

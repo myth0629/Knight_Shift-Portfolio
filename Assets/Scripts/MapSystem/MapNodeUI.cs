@@ -18,10 +18,8 @@ namespace MapSystem
         
         [Header("Node Type Sprites")]
         [SerializeField] private Sprite battleSprite;
-        [SerializeField] private Sprite eventSprite;
         [SerializeField] private Sprite shopSprite;
         [SerializeField] private Sprite campSprite;
-        [SerializeField] private Sprite eliteSprite;
         [SerializeField] private Sprite bossSprite;
         [SerializeField] private Sprite startSprite;
         
@@ -29,7 +27,6 @@ namespace MapSystem
         [SerializeField] private Color battleColor = Color.red;
         [SerializeField] private Color shopColor = Color.green;
         [SerializeField] private Color campColor = Color.yellow;
-        [SerializeField] private Color eliteColor = new Color(0.8f, 0.2f, 0.8f); // Purple
         [SerializeField] private Color bossColor = new Color(0.8f, 0.1f, 0.1f); // Dark Red
         [SerializeField] private Color startColor = Color.white;
         [SerializeField] private Color accessibleColor = Color.white;
@@ -94,7 +91,6 @@ namespace MapSystem
                 case NodeType.Battle: return battleSprite;
                 case NodeType.Shop: return shopSprite;
                 case NodeType.Camp: return campSprite;
-                case NodeType.Elite: return eliteSprite;
                 case NodeType.Boss: return bossSprite;
                 case NodeType.Start: return startSprite;
                 default: return battleSprite;
@@ -108,7 +104,6 @@ namespace MapSystem
                 case NodeType.Battle: return battleColor;
                 case NodeType.Shop: return shopColor;
                 case NodeType.Camp: return campColor;
-                case NodeType.Elite: return eliteColor;
                 case NodeType.Boss: return bossColor;
                 case NodeType.Start: return startColor;
                 default: return battleColor;
@@ -122,7 +117,6 @@ namespace MapSystem
                 case NodeType.Battle: return "전투";
                 case NodeType.Shop: return "상점";
                 case NodeType.Camp: return "캠프";
-                case NodeType.Elite: return "엘리트";
                 case NodeType.Boss: return "보스";
                 case NodeType.Start: return "시작";
                 default: return "";
