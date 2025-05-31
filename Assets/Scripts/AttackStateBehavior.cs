@@ -34,7 +34,7 @@ public class AttackStateBehaviour : StateMachineBehaviour
         SkillController skillController = animator.GetComponent<SkillController>();
         if (skillController != null)
         {
-            // 필요한 마무리 처리
+            
         }
     }
 }

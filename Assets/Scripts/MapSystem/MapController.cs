@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using UnityEngine.SceneManagement;
 
 namespace MapSystem
 {
@@ -144,14 +145,25 @@ namespace MapSystem
         private void Start()
         {
             DebugLogMapStructure();
-            
-            // 씬 전환 후 저장된 노드 ID가 있는지 확인
+            Debug.Log("MapController initialized");
+
+            // 씬 로드 이벤트를 통해 노드 갱신 시도
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private void OnDestroy()
+        {
+            // 이벤트 해제
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
             if (PlayerPrefs.HasKey("SelectedNodeId"))
             {
                 int selectedNodeId = PlayerPrefs.GetInt("SelectedNodeId");
                 SelectNode(selectedNodeId);
-                
-                // 사용한 후 키 제거
+                Debug.Log($"{selectedNodeId} 노드로 이동되었습니다.");
                 PlayerPrefs.DeleteKey("SelectedNodeId");
             }
         }

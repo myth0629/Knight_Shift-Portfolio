@@ -18,12 +18,29 @@ public class PortalGenerator : MonoBehaviour
 
     private Dictionary<int, GameObject> spawnedPortals = new Dictionary<int, GameObject>();
     private MapController mapController;
-
+    
+    private void Awake()
+    {
+        if (portalParent == null)
+        {
+            var found = GameObject.Find("Portal Parent");
+            if (found != null)
+            {
+                portalParent = found.transform;
+                Debug.Log("portalParent assigned via Awake.");
+            }
+            else
+            {
+                Debug.LogWarning("Portal Parent object not found in scene during Awake.");
+            }
+        }
+    }
+    
     private void Start()
     {
-        MapController.Instance.OnNodeSelected += HandleNodeSelected;
+        //MapController.Instance.OnNodeSelected += HandleNodeSelected;
         // 초기 포탈 생성도 여기서
-        HandleNodeSelected(MapController.Instance.GetAllNodes().Find(n => n.isCurrent));
+        //HandleNodeSelected(MapController.Instance.GetAllNodes().Find(n => n.isCurrent));
         
         mapController = MapController.Instance;
         if (mapController == null)
@@ -78,7 +95,7 @@ public class PortalGenerator : MonoBehaviour
         }
 
         float startX = startPosition.x - ((nodesToSpawn.Count - 1) * portalSpacingX / 2f);
-        float zPos = startPosition.z + 10f;
+        float zPos = startPosition.z;
             
         Debug.Log($"currentNode: {currentNode.id}, 자식 개수: {currentNode.childNodeIds.Count}");
         Debug.Log($"생성할 포탈 개수: {nodesToSpawn.Count}");
@@ -100,13 +117,23 @@ public class PortalGenerator : MonoBehaviour
         GameObject prefab = GetPrefabForNodeType(node.nodeType);
         if (prefab == null) return;
         
-        // 포털 인스턴스 생성
-        GameObject portal = Instantiate(prefab, position, Quaternion.identity, portalParent);
+        // 포털 인스턴스 생성: prefab을 portalParent의 로컬 공간에서 Vector3.zero에 인스턴스화 한 뒤, localPosition을 position으로 설정
+        GameObject portal = Instantiate(prefab, Vector3.zero, Quaternion.identity, portalParent);
+        portal.transform.localPosition = position;
+        
         portal.name = $"Portal_{node.nodeType}_{node.id}";
         
-        // 포털에 노드 ID 정보 저장
-        PortalInteraction portalInteraction = portal.AddComponent<PortalInteraction>();
-        portalInteraction.Initialize(node.id, this);
+        // 포털 컴포넌트에 노드 ID 설정
+        Portal portalComponent = portal.GetComponent<Portal>();
+        if (portalComponent != null)
+        {
+            portalComponent.SetNodeId(node.id);
+            Debug.Log($"Set nodeId {node.id} to Portal component");
+        }
+        else
+        {
+            Debug.LogWarning("Portal component not found on prefab!");
+        }
         
         // 딕셔너리에 저장
         spawnedPortals[node.id] = portal;
@@ -175,30 +202,5 @@ public class PortalGenerator : MonoBehaviour
             }
         }
         spawnedPortals.Clear();
-    }
-    
-    public void OnPortalClicked(int nodeId)
-    {
-        // 플레이어가 포털을 클릭하면 맵 컨트롤러에 노드 선택 전달
-        mapController.SelectNode(nodeId);
-    }
-}
-
-// 포털 클릭 이벤트를 처리하는 컴포넌트
-public class PortalInteraction : MonoBehaviour
-{
-    private int nodeId;
-    private PortalGenerator portalGenerator;
-    
-    public void Initialize(int id, PortalGenerator generator)
-    {
-        nodeId = id;
-        portalGenerator = generator;
-    }
-    
-    private void OnMouseDown()
-    {
-        // 포털 클릭 시 이벤트 발생
-        portalGenerator.OnPortalClicked(nodeId);
     }
 }
