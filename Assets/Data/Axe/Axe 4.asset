@@ -10,9 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e7e1d8842cb6f4d4b9329eefba3fa3ec, type: 3}
-  m_Name: Base Axe
+  m_Name: Axe 4
   m_EditorClassIdentifier: 
-  weaponName: Base Axe
+  weaponName: "\uC601\uD63C \uC218\uD655\uC790"
   weaponType: 1
-  damage: 10
-  weaponModelPrefab: {fileID: 120167503432726159, guid: cee4823b6b48141bb99e4fd1dae91a59, type: 3}
+  damage: 25
+  weaponModelPrefab: {fileID: 8442185660769940636, guid: 7a0c11fee23b943398f91cb263117a3d, type: 3}
+  tier: 0

@@ -7,4 +7,5 @@ public class WeaponData : ScriptableObject
     public WeaponType weaponType;
     public float damage;
     public GameObject weaponModelPrefab;
+    public int tier; // 무기 티어 (1, 2, 3, 4)
 }

@@ -10,7 +10,22 @@ public class WeaponManager : MonoBehaviour
     [SerializeField] WeaponData StartWeaponData;
     [SerializeField] WeaponData testWeaponData;
     [SerializeField] private Animator animator;
-
+    
+    // 싱글톤 인스턴스
+    public static WeaponManager Instance { get; private set; }
+    
+    private void Awake()
+    {
+        Debug.Log("WeaponManager Awake");
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+    
     void Start()
     {
         currentWeaponData = StartWeaponData;

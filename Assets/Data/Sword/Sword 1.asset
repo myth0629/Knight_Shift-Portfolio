@@ -10,8 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e7e1d8842cb6f4d4b9329eefba3fa3ec, type: 3}
-  m_Name: Upgrade Sword - 3
+  m_Name: Sword 1
   m_EditorClassIdentifier: 
-  weaponName: Upgrade Sword 3
-  damage: 20
-  weaponModelPrefab: {fileID: 2896597793180504644, guid: 5bc28a2f86dae4cb2aa10f0d5fac3733, type: 3}
+  weaponName: "\uB179\uC2A8 \uAC80"
+  weaponType: 0
+  damage: 10
+  weaponModelPrefab: {fileID: 2645307744113326944, guid: 8166bbf1d57f048aa9e4333a3e51f7ee, type: 3}
+  tier: 1

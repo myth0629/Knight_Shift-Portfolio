@@ -10,9 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e7e1d8842cb6f4d4b9329eefba3fa3ec, type: 3}
-  m_Name: Base Sword
+  m_Name: Sword 2
   m_EditorClassIdentifier: 
-  weaponName: Base Sword
+  weaponName: "\uC6A9\uBCD1\uC758 \uAC80"
   weaponType: 0
-  damage: 10
-  weaponModelPrefab: {fileID: 2645307744113326944, guid: 8166bbf1d57f048aa9e4333a3e51f7ee, type: 3}
+  damage: 12
+  weaponModelPrefab: {fileID: 3314298209511135241, guid: a75fda8fa764443618744001806da1fe, type: 3}
+  tier: 2

@@ -8,6 +8,14 @@ public class UpgradeManager : MonoBehaviour
 
     void Start()
     {
+        // 비활성화 상태인 오브젝트도 찾음
+        displaySlots = FindObjectsByType<WeaponDisplay>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (displaySlots.Length == 0)
+        {
+            Debug.LogWarning("WeaponDisplay slots not found in scene.");
+            return;
+        }
+
         ShowRandomUpgrades();
     }
 

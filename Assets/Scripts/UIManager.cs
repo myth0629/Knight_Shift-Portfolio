@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -8,6 +9,25 @@ public class UIManager : MonoBehaviour
     public CinemachineCamera vcam;
     
     private bool isPanelOpen = false;
+
+    private void Start()
+    {
+        uiPanel = FindInactiveObjectByName("SlotPanel");
+        vcam = FindFirstObjectByType<CinemachineCamera>();
+    }
+
+    private GameObject FindInactiveObjectByName(string name)
+    {
+        Transform[] allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
+        foreach (Transform t in allTransforms)
+        {
+            if (t.hideFlags == HideFlags.None && t.name == name)
+            {
+                return t.gameObject;
+            }
+        }
+        return null;
+    }
 
     void Update()
     {
