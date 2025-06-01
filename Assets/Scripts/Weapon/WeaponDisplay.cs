@@ -57,6 +57,8 @@ public class WeaponDisplay : MonoBehaviour
             weaponNameText.text = "Unknown Weapon";
         }
         
+        
+        
         if (weaponData != null && weaponManager != null)
         {
             selectButton.onClick.RemoveAllListeners();
