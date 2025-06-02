@@ -14,7 +14,9 @@ public class PortalGenerator : MonoBehaviour
     [Header("Portal Placement")]
     [SerializeField] private Transform portalParent;
     [SerializeField] private float portalSpacingX = 3f;
+    [SerializeField] private float portalSpacingZ = 3f;
     [SerializeField] private Vector3 startPosition = new Vector3(0, 0, 0);
+    [SerializeField] private Vector3 startRotation = new Vector3(0, 0, 0);
 
     private Dictionary<int, GameObject> spawnedPortals = new Dictionary<int, GameObject>();
     private MapController mapController;
@@ -95,7 +97,7 @@ public class PortalGenerator : MonoBehaviour
         }
 
         float startX = startPosition.x - ((nodesToSpawn.Count - 1) * portalSpacingX / 2f);
-        float zPos = startPosition.z;
+        float startZ = startPosition.z - ((nodesToSpawn.Count - 1) * portalSpacingZ / 2f);
             
         Debug.Log($"currentNode: {currentNode.id}, 자식 개수: {currentNode.childNodeIds.Count}");
         Debug.Log($"생성할 포탈 개수: {nodesToSpawn.Count}");
@@ -104,6 +106,7 @@ public class PortalGenerator : MonoBehaviour
         {
             MapNode node = nodesToSpawn[i];
             float xPos = startX + (i * portalSpacingX);
+            float zPos = startZ + (i * portalSpacingZ);
             CreatePortalForNode(node, new Vector3(xPos, startPosition.y, zPos));
         }
 
@@ -120,6 +123,7 @@ public class PortalGenerator : MonoBehaviour
         // 포털 인스턴스 생성: prefab을 portalParent의 로컬 공간에서 Vector3.zero에 인스턴스화 한 뒤, localPosition을 position으로 설정
         GameObject portal = Instantiate(prefab, Vector3.zero, Quaternion.identity, portalParent);
         portal.transform.localPosition = position;
+        portal.transform.localRotation = Quaternion.Euler(startRotation);
         
         portal.name = $"Portal_{node.nodeType}_{node.id}";
         
