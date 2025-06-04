@@ -4,22 +4,27 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.PlayerLoop;
 
-public class Skeleton : MonoBehaviour, IDamageable
+public class EnemyController : MonoBehaviour, IDamageable
 {
     [Header("기본 설정")]
     [SerializeField] float maxHp = 100f;
     [SerializeField] float currentHp;
+    [SerializeField] float recognitionRange = 10f; // 플레이어를 인식하는 범위
+    [SerializeField] int dropGold = 10; // 적 처치 시 드랍되는 골드 양
     
     [Header("공격 설정")]
     [SerializeField] float attackRange = 1.5f;
     [SerializeField] float attackDamage = 20f; // Init 함수 통해 Weapon에 넘겨줌
     [SerializeField] float attackCooldown = 1f;
+    [SerializeField] bool canAttack = true;
+    
     Weapon weapon;
+    PlayerStatus player;
+    
     float attackTimer;
     public bool isAttacking = false;
-    [SerializeField] bool canAttack = true;
+    
     bool isDead = false;
-    private PlayerStatus player;
     
     public Transform playerTransform;
     NavMeshAgent agent;
@@ -37,6 +42,12 @@ public class Skeleton : MonoBehaviour, IDamageable
     {
         currentHp = maxHp;
         weapon.Init(attackDamage); // Weapon에 공격 데미지 전달
+
+        if (playerTransform == null)
+        {
+            string playerPositionName = "PlayerCameraRoot";
+            playerTransform = GameObject.Find(playerPositionName).transform;
+        }
     }
 
     private void Update()
@@ -51,7 +62,7 @@ public class Skeleton : MonoBehaviour, IDamageable
         {
             Attack();
         }
-        else
+        else if(Vector3.Distance(transform.position, playerTransform.position) < recognitionRange)
         {
             ChasePlayer();
         }

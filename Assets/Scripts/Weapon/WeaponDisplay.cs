@@ -65,7 +65,7 @@ public class WeaponDisplay : MonoBehaviour
             selectButton.onClick.AddListener(() =>
             {
                 weaponManager.EquipWeapon(weaponData);
-                uiManager.ToggleUIPanel();
+                uiManager.ToggleUpgradeUIPanel();
             });
         }
         else

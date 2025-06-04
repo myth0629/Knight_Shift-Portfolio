@@ -69,12 +69,14 @@ public class PersistentObjectManager : MonoBehaviour
             // 새 씬의 PlayerStart 오브젝트 찾기
             GameObject playerStart = GameObject.FindGameObjectWithTag("PlayerStart");
             Vector3 targetPosition = playerStart != null ? playerStart.transform.position : new Vector3(0, 1, 0);
+            Vector3 targetRotation = playerStart != null ? playerStart.transform.rotation.eulerAngles : Vector3.zero;
 
             CharacterController controller = player.GetComponent<CharacterController>();
             if (controller != null)
             {
                 controller.enabled = false;
                 player.transform.position = targetPosition;
+                player.transform.localRotation = Quaternion.Euler(targetRotation);
                 controller.enabled = true;
                 Debug.Log($"플레이어(Rigidbody) 위치를 {targetPosition}로 조정했습니다.");
             }

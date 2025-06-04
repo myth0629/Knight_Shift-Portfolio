@@ -32,15 +32,6 @@ public class WeaponManager : MonoBehaviour
         EquipWeapon(currentWeaponData);
     }
 
-    void Update()
-    {
-        // 테스트용 (추후 수정)
-        if (Input.GetKeyDown(KeyCode.Q))
-        {
-            EquipWeapon(testWeaponData);
-        }
-    }
-
     public void EquipWeapon(WeaponData newWeaponData)
     {
         // 이전 무기 제거
