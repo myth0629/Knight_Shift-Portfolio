@@ -20,6 +20,7 @@ public class EnemyController : MonoBehaviour, IDamageable
     
     Weapon weapon;
     PlayerStatus player;
+    PlayerDataManager playerData;
     
     float attackTimer;
     public bool isAttacking = false;
@@ -36,6 +37,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
         player = FindFirstObjectByType<PlayerStatus>();
+        playerData = FindFirstObjectByType<PlayerDataManager>();
     }
 
     void Start()
@@ -118,6 +120,8 @@ public class EnemyController : MonoBehaviour, IDamageable
         animator.SetTrigger("Death");
         GetComponent<Collider>().enabled = false;
         agent.isStopped = true;
+        playerData.AddGold(dropGold);
+        
         Destroy(gameObject, 3f);
     }
     
