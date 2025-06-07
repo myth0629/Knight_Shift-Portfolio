@@ -1,21 +1,29 @@
 using System;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class PlayerDataManager : MonoBehaviour
 {
     PlayerUI playerUI;
+    FirebaseGoldManager goldManager;
     
     public static PlayerDataManager Instance { get; private set; }
 
     public int Gold { get; private set; }
 
-    private void Awake()
+    private async void Awake()
     {
+        goldManager = FindFirstObjectByType<FirebaseGoldManager>();
+
         if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject); // 씬 이동에도 유지
-            LoadData();
+
+            while (!FirebaseInit.IsReady)
+                await Task.Yield(); // Firebase 초기화 대기
+
+            await LoadData();
         }
         else
         {
@@ -26,6 +34,7 @@ public class PlayerDataManager : MonoBehaviour
     private void Start()
     {
         playerUI = FindFirstObjectByType<PlayerUI>();
+        goldManager = FindFirstObjectByType<FirebaseGoldManager>();
     }
 
     public void AddGold(int amount)
@@ -33,7 +42,8 @@ public class PlayerDataManager : MonoBehaviour
         Gold += amount;
         Debug.Log(amount + " gold added. Total gold: " + Gold);
         playerUI.UpdateGold();
-        SaveData();
+        // db에서 금액 업데이트
+        goldManager.SaveGold(Gold);
     }
 
     public bool SpendGold(int amount)
@@ -42,19 +52,19 @@ public class PlayerDataManager : MonoBehaviour
             return false;
 
         Gold -= amount;
-        SaveData();
+        // db에서 금액 업데이트
+        goldManager.SaveGold(Gold);
         return true;
     }
-
-    private void LoadData()
+    
+    private async Task LoadData()
     {
-        // TODO: DB 연동 혹은 로컬 저장소에서 불러오기
-        // 예시: Gold = PlayerPrefs.GetInt("Gold", 0);
-    }
+        while (FirebaseGoldManager.Instance == null || !FirebaseGoldManager.Instance.IsGoldLoaded)
+            await Task.Yield();
 
-    private void SaveData()
-    {
-        // TODO: DB 저장 혹은 로컬 저장소로 저장
-        // 예시: PlayerPrefs.SetInt("Gold", Gold);
+        Gold = FirebaseGoldManager.Instance.CurrentGold;
+        playerUI.UpdateGold();
+
+        Debug.Log("Gold loaded: " + Gold);
     }
 }

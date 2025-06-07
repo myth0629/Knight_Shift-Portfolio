@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 
 public class FirebaseAuthManager : MonoBehaviour
 {
+    
     public async Task<bool> Register(string email, string password)
     {
         try
@@ -27,6 +28,7 @@ public class FirebaseAuthManager : MonoBehaviour
             var userCredential = await FirebaseInit.Auth.SignInWithEmailAndPasswordAsync(email, password);
             FirebaseInit.User = userCredential.User;
             Debug.Log($"로그인 성공: {FirebaseInit.User.Email}");
+            
             return true;
         }
         catch (System.Exception e)

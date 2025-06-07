@@ -21,6 +21,7 @@ public class LoginUI : MonoBehaviour
         if (success)
         {
             SceneManager.LoadScene(nextSceneName);
+            Cursor.lockState = CursorLockMode.Locked;
         }
     }
 
