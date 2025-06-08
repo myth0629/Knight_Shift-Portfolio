@@ -100,4 +100,11 @@ public class UIManager : MonoBehaviour
             vcam.gameObject.SetActive(true);
         }
     }
+    
+    // 공통 패널 닫기 함수
+    public void ClosePanel(GameObject panel)
+    {
+        panel.SetActive(false);
+    }
+
 }
