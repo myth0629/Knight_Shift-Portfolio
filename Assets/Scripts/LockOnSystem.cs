@@ -27,6 +27,22 @@ public class LockOnSystem : MonoBehaviour
         }
     }
     
+    void LateUpdate()
+    {
+        if (currentTarget != null)
+        {
+            vcam.Follow = playerCameraRoot.transform;
+            vcam.LookAt = currentTarget != null ? currentTarget : playerCameraRoot.transform;
+            
+            if (!currentTarget.gameObject.activeInHierarchy)
+            {
+                currentTarget = null;
+                vcam.LookAt = null;
+                return;
+            }
+        }
+    }
+    
     public Transform FindNearestTarget(float radius)
     {
         Collider[] colliders = Physics.OverlapSphere(transform.position, radius, enemyLayer);
@@ -46,20 +62,10 @@ public class LockOnSystem : MonoBehaviour
         return nearestTarget;
     }
     
-    void LateUpdate()
+    public void Unlock()
     {
-        if (currentTarget != null)
-        {
-            vcam.Follow = playerCameraRoot.transform;
-            vcam.LookAt = currentTarget != null ? currentTarget : playerCameraRoot.transform;
-            
-            if (!currentTarget.gameObject.activeInHierarchy)
-            {
-                currentTarget = null;
-                vcam.LookAt = null;
-                return;
-            }
-        }
+        currentTarget = null;
+        vcam.LookAt = playerCameraRoot.transform;
     }
 
     public Transform GetCurrentTarget()

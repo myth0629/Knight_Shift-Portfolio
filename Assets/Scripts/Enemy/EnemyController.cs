@@ -120,7 +120,14 @@ public class EnemyController : MonoBehaviour, IDamageable
         animator.SetTrigger("Death");
         GetComponent<Collider>().enabled = false;
         agent.isStopped = true;
-        playerData.AddGold(dropGold);
+        //playerData.AddGold(dropGold);
+
+        LockOnSystem lockOn = FindFirstObjectByType<LockOnSystem>();
+        if (lockOn != null)
+        {
+            Debug.Log("Unlock");
+            lockOn.Unlock();
+        }
         
         Destroy(gameObject, 3f);
     }
