@@ -1,7 +1,9 @@
 using System;
+using StarterAssets;
 using TMPro;
 using Unity.Cinemachine;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class UIManager : MonoBehaviour
 {
@@ -9,12 +11,14 @@ public class UIManager : MonoBehaviour
     public GameObject shopPanel; // 상점 UI 패널 (Start Scene에서 사용)
     public CinemachineCamera vcam;
     
+    PlayerInput input;
     private bool isPanelOpen = false;
 
     private void Start()
     {
         slotPanel = FindInactiveObjectByName("SlotPanel");
         vcam = FindFirstObjectByType<CinemachineCamera>();
+        input = FindFirstObjectByType<PlayerInput>();
     }
 
     private GameObject FindInactiveObjectByName(string name)
@@ -80,9 +84,8 @@ public class UIManager : MonoBehaviour
             // 마우스 커서 보이게 & 잠금 해제
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-
-            // 게임 일시정지 (필요 시)
-            Time.timeScale = 0f;
+            
+            input.enabled = false;
             
             // 카메라 시점 이동 금지
             vcam.gameObject.SetActive(false);
@@ -92,9 +95,8 @@ public class UIManager : MonoBehaviour
             // 마우스 커서 숨기고 잠금
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
-
-            // 게임 재시작
-            Time.timeScale = 1f;
+            
+            input.enabled = true;
             
             // 카메라 시점 이동 허용
             vcam.gameObject.SetActive(true);
