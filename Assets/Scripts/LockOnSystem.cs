@@ -5,9 +5,13 @@ using Unity.Cinemachine;
 public class LockOnSystem : MonoBehaviour
 {
     [SerializeField] float lockOnDistance = 10f;
+    [SerializeField] float unlockDistance = 15f;
     [SerializeField] LayerMask enemyLayer;
     [SerializeField] private CinemachineTargetGroup targetGroup;
-    [SerializeField] private Transform lookAtProxy;
+    [SerializeField] private CinemachineCamera vcam_Normal;
+    [SerializeField] private CinemachineCamera vcam_LockOn;
+    [SerializeField] private GameObject lockOnIndicatorPrefab;
+    private GameObject activeIndicator;
     public Transform currentTarget;
     private CinemachineCamera vcam;
     private GameObject playerCameraRoot;
@@ -42,15 +46,17 @@ public class LockOnSystem : MonoBehaviour
                 Unlock();
             }
         }
+        else if (Vector3.Distance(transform.position, currentTarget.position) > unlockDistance)
+        {
+            Unlock();
+        }
     }
     
     void LateUpdate()
     {
         if (currentTarget != null)
         {
-            lookAtProxy.position = Vector3.Lerp(lookAtProxy.position, currentTarget.position, Time.deltaTime * 5f);
             vcam.Follow = playerCameraRoot.transform;
-            vcam.LookAt = lookAtProxy;
 
             if (!currentTarget.gameObject.activeInHierarchy)
             {
@@ -73,6 +79,9 @@ public class LockOnSystem : MonoBehaviour
         if (targetGroup == null || playerCameraRoot == null || target == null)
             return;
 
+        vcam_LockOn.Follow = playerCameraRoot.transform;
+        vcam_LockOn.LookAt = targetGroup.transform;
+
         Transform lockOnTarget = target.Find("LockOnTarget");
         if (lockOnTarget == null)
         {
@@ -82,11 +91,17 @@ public class LockOnSystem : MonoBehaviour
 
         currentTarget = lockOnTarget;
 
+        if (lockOnIndicatorPrefab != null)
+        {
+            activeIndicator = Instantiate(lockOnIndicatorPrefab, lockOnTarget);
+            activeIndicator.transform.localPosition = Vector3.up; // Adjust height as needed
+        }
+
         targetGroup.Targets.Clear();
         targetGroup.Targets.Add(new CinemachineTargetGroup.Target
         {
             Object = playerCameraRoot.transform,
-            Weight = 1,
+            Weight = 1f,
             Radius = 0.5f
         });
         targetGroup.Targets.Add(new CinemachineTargetGroup.Target
@@ -99,7 +114,8 @@ public class LockOnSystem : MonoBehaviour
         if (rotationComposer != null) rotationComposer.enabled = true;
         if (groupComposer != null) groupComposer.enabled = true;
 
-        // vcam.LookAt = targetGroup.transform;
+        vcam_LockOn.Priority = 20;
+        vcam_Normal.Priority = 10;
     }
     
     public Transform FindNearestTarget(float radius)
@@ -123,6 +139,12 @@ public class LockOnSystem : MonoBehaviour
     
     public void Unlock()
     {
+        if (activeIndicator != null)
+        {
+            Destroy(activeIndicator);
+            activeIndicator = null;
+        }
+
         currentTarget = null;
 
         if (targetGroup == null || playerCameraRoot == null)
@@ -139,7 +161,11 @@ public class LockOnSystem : MonoBehaviour
             Radius = 0.5f
         });
 
-        vcam.LookAt = playerCameraRoot.transform;
+        vcam_Normal.Follow = playerCameraRoot.transform;
+        vcam_Normal.LookAt = playerCameraRoot.transform;
+
+        vcam_LockOn.Priority = 0;
+        vcam_Normal.Priority = 20;
     }
 
     public Transform GetCurrentTarget()
