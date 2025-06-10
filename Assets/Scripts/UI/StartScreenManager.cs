@@ -91,4 +91,9 @@ public class StartScreenUIManager : MonoBehaviour
     {
         panel.SetActive(false);
     }
+    
+    public void StartSceneLoad()
+    {
+        SceneManager.LoadScene("Start");
+    }
 }

@@ -4,6 +4,7 @@ using TMPro;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
 {
@@ -108,5 +109,4 @@ public class UIManager : MonoBehaviour
     {
         panel.SetActive(false);
     }
-
 }
