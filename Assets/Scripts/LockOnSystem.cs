@@ -49,6 +49,16 @@ public class LockOnSystem : MonoBehaviour
         {
             Unlock();
         }
+
+        // 락온 거리를 벗어나면 자동 언록
+        if (CurrentTarget != null)
+        {
+            float distanceToTarget = Vector3.Distance(playerTransform.position, CurrentTarget.position);
+            if (distanceToTarget > lockOnDistance)
+            {
+                Unlock();
+            }
+        }
     }
 
     private void LockOn()
