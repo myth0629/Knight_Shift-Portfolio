@@ -1,112 +1,40 @@
-using System;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.AI;
-using UnityEngine.PlayerLoop;
 
 public class EnemyController : MonoBehaviour, IDamageable
 {
-    [Header("기본 설정")]
-    [SerializeField] float maxHp = 100f;
-    [SerializeField] float currentHp;
-    [SerializeField] float recognitionRange = 10f; // 플레이어를 인식하는 범위
-    [SerializeField] int dropGold = 10; // 적 처치 시 드랍되는 골드 양
-    
-    [Header("공격 설정")]
-    [SerializeField] float attackRange = 1.5f;
-    [SerializeField] float attackDamage = 20f; // Init 함수 통해 Weapon에 넘겨줌
-    [SerializeField] float attackCooldown = 1f;
-    [SerializeField] bool canAttack = true;
-    
-    Weapon weapon;
-    PlayerStatus player;
-    PlayerDataManager playerData;
-    
-    float attackTimer;
-    public bool isAttacking = false;
-    
-    bool isDead = false;
-    
-    public Transform playerTransform;
-    NavMeshAgent agent;
-    Animator animator;
+    [Header("Stats")]
+    [SerializeField] private float maxHp = 100f;
+    [SerializeField] private float currentHp;
+    [SerializeField] private int dropGold = 10;
+    [SerializeField] private float attackDamage = 20f; // 무기 초기화용
+
+    [Header("Flags (읽기전용)")] public bool isDead = false;
+
+    private Weapon weapon;
+    private Animator animator;
+    private PlayerDataManager playerData;
 
     private void Awake()
     {
         weapon = GetComponentInChildren<Weapon>();
-        agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
-        player = FindFirstObjectByType<PlayerStatus>();
         playerData = FindFirstObjectByType<PlayerDataManager>();
     }
 
     void Start()
     {
-        currentHp = maxHp;
-        weapon.Init(attackDamage); // Weapon에 공격 데미지 전달
-
-        if (playerTransform == null)
-        {
-            string playerPositionName = "PlayerCameraRoot";
-            playerTransform = GameObject.Find(playerPositionName).transform;
-        }
+        currentHp = Mathf.Clamp(currentHp <= 0 ? maxHp : currentHp, 0, maxHp);
+        if (weapon != null) weapon.Init(attackDamage);
     }
 
-    private void Update()
-    {
-        if(isDead || player.isDead) return;
-        
-        attackTimer += Time.deltaTime;
-        
-        animator.SetFloat("Speed", agent.velocity.magnitude);
-        
-        if(Vector3.Distance(transform.position, playerTransform.position) < attackRange)
-        {
-            Attack();
-        }
-        else if(Vector3.Distance(transform.position, playerTransform.position) < recognitionRange)
-        {
-            ChasePlayer();
-        }
-        
-        AttackCooldown();
-    }
-
-    void AttackCooldown()
-    {
-        if (attackTimer >= attackCooldown)
-        {
-            canAttack = true;
-        }
-    }
-
-    void Attack()
-    {  
-        if(!canAttack) return;
-        
-        animator.SetTrigger("Attack");
-        agent.isStopped = true;
-        canAttack = false;
-        attackTimer = 0;
-        AttackCooldown();
-    }
-
-    void ChasePlayer()
-    {
-        if(isAttacking) return;
-        
-        agent.isStopped = false;
-        animator.SetFloat("Speed", agent.velocity.magnitude);
-        agent.SetDestination(playerTransform.position);
-    }
+    // 이동 / 추격 / 공격 판단 로직은 Behavior Tree(EnemyBehaviorTree)에서 수행.
+    // 이 스크립트는 체력/사망/무기 콜라이더 제어만 담당.
     
     public void TakeDamage(float damageAmount)
     {
-        attackTimer = attackCooldown;
         Debug.Log("Skeleton Damage Taken: " + damageAmount);
         currentHp -= damageAmount;
-        attackTimer = 1; // 피격 시 공격 쿨타임 증가
-        animator.SetTrigger("Hit");
+        if (!isDead && animator != null) animator.SetTrigger("Hit");
         if (currentHp <= 0)
         {
             currentHp = 0;
@@ -117,10 +45,11 @@ public class EnemyController : MonoBehaviour, IDamageable
     void Die()
     {
         isDead = true;
-        animator.SetTrigger("Death");
-        GetComponent<Collider>().enabled = false;
-        agent.isStopped = true;
-        //playerData.AddGold(dropGold);
+        if (animator != null) animator.SetTrigger("Death");
+        var col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+        // 골드 지급: 플레이어 데이터 시스템이 존재할 때만
+        // playerData?.AddGold(dropGold);
 
         LockOnSystem lockOn = FindFirstObjectByType<LockOnSystem>();
         if (lockOn != null)
@@ -128,7 +57,6 @@ public class EnemyController : MonoBehaviour, IDamageable
             Debug.Log("Unlock");
             lockOn.Unlock();
         }
-        
         Destroy(gameObject, 3f);
     }
     

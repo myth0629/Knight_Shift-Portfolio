@@ -56,8 +56,38 @@ public class LockOnSystem : MonoBehaviour
         Unlock();
     }
 
+    private bool playerDead = false;
+
     private void Update()
     {
+        // 플레이어 사망 시 자동 언락 (한 번만)
+        if (!playerDead && playerTransform != null)
+        {
+            // PlayerHealth 타입이 없을 수도 있으므로 GetComponent 반환 object를 dynamic 점검
+            var comp = playerTransform.GetComponent<Component>(); // placeholder fetch not helpful for type; try by string
+            // 문자열 기반으로 Search (비용 낮음: 플레이어 하나)
+            var all = playerTransform.GetComponents<MonoBehaviour>();
+            foreach (var mb in all)
+            {
+                if (mb == null) continue;
+                var type = mb.GetType();
+                if (type.Name == "PlayerHealth")
+                {
+                    var prop = type.GetProperty("IsDead");
+                    if (prop != null)
+                    {
+                        object val = prop.GetValue(mb);
+                        if (val is bool dead && dead)
+                        {
+                            playerDead = true;
+                            if (CurrentTarget != null) Unlock();
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
         if (Input.GetKeyDown(KeyCode.Q))
         {
             if (CurrentTarget == null)
