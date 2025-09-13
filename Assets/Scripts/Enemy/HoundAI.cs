@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
+using EnemyAI;
 
 public class HoundAI : MonoBehaviour, IDamageable
 {
@@ -189,6 +190,7 @@ public class HoundAI : MonoBehaviour, IDamageable
     [Header("자연스러운 회전 설정")]
     [SerializeField] float rotationSpeed = 2f;
     [SerializeField] bool useNavMeshRotation = true;
+    [SerializeField] float closeFacingDistanceOverride = 0.6f; // 아주 근접 시 각도 무시
     
     private Quaternion targetRotation;
 
@@ -243,7 +245,7 @@ public class HoundAI : MonoBehaviour, IDamageable
 
         StartCoroutine(RetreatThenProjectileAttack());
     }
-    void PerformChargeAttack()
+    public void PerformChargeAttack()
     {
         if (chargeAttackTimer > 0)
         {
@@ -253,6 +255,12 @@ public class HoundAI : MonoBehaviour, IDamageable
             return;
         }
         if (isCharging) return;
+
+        // Behavior Tree 사용 시 공격 상태 설정
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(true);
+        }
 
         StartCoroutine(ChargeAttackPattern());
     chargeAttackTimer = chargeAttackCooldown;
@@ -324,6 +332,12 @@ public class HoundAI : MonoBehaviour, IDamageable
         SetAnimationParameters(0f, 0f, 0f);
         isCharging = false;
         SafeResumeAgent();
+
+        // Behavior Tree 사용 시 공격 상태 해제
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
 
         if (chargeParticles != null)
         {
@@ -583,13 +597,18 @@ public class HoundAI : MonoBehaviour, IDamageable
     bool IsLookingAtPlayer()
     {
         if (player == null) return false;
-        
-        Vector3 dirToPlayer = (player.position - transform.position).normalized;
-        dirToPlayer.y = 0;
-        
-        if (dirToPlayer.magnitude < 0.01f) return false;
-        
-        float angle = Vector3.Angle(transform.forward, dirToPlayer);
+
+        Vector3 toPlayer = player.position - transform.position;
+        toPlayer.y = 0f;
+
+        float dist = toPlayer.magnitude;
+        if (dist < 0.01f) return false;
+
+        // 아주 근접하면 각도 무시하고 true 처리
+        if (dist <= closeFacingDistanceOverride) return true;
+
+        Vector3 dir = toPlayer / dist; // 정규화
+        float angle = Vector3.Angle(transform.forward, dir);
         return angle <= attackAngleThreshold;
     }
 
@@ -745,7 +764,7 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             animator.SetLayerWeight(upperBodyLayerIndex, upperBodyLayerWeight);
         }
         if (bossHealthBar == null)
-            bossHealthBar = FindObjectOfType<SimpleBossHealthBar>();
+            bossHealthBar = FindFirstObjectByType<SimpleBossHealthBar>();
         if (bossHealthBar != null)
         {
             bossHealthBar.ShowBossHealthBar(bossName, maxHp, currentHp);
@@ -754,6 +773,12 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
         soundManager = GetComponent<HoundSoundManager>();
         DisableAttackCollider();
+
+        // Behavior Tree 초기화
+        if (useBehaviorTree && houndBehaviorTree == null)
+        {
+            houndBehaviorTree = GetComponent<HoundBehaviorTree>();
+        }
     }
 
     void FindPlayer()
@@ -782,9 +807,23 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
 }
 
 
+    [Header("Behavior Tree Mode")]
+    [SerializeField] private bool useBehaviorTree = false; // 인스펙터에서 설정 가능
+    private HoundBehaviorTree houndBehaviorTree;
+    
     void Update()
     {
         if (isDead || player == null) return;
+
+        // 점프 중이면 Behavior Tree 모드와 관계없이 처리해야 함
+        if (isJumpingToTarget)
+        {
+            jumpTimer -= Time.deltaTime;
+            HandleNavMeshJump();
+        }
+
+        // Behavior Tree 모드가 활성화되면 나머지 AI 로직 비활성화
+        if (useBehaviorTree) return;
 
         if (Input.GetKeyDown(KeyCode.R))
         {
@@ -817,11 +856,6 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         HandleNaturalCollisionAvoidance(distance);
         HandleCombatState(distance);
         HandleMovementWithBlendTree(distance);
-        
-        if (isJumpingToTarget)
-        {
-            HandleNavMeshJump();
-        }
     }
     void UpdatePhase2Damages()
     {
@@ -841,7 +875,7 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             Debug.Log($"돌진: {chargeDamage}, 쉴드패턴: {massiveDamage}");
         }
     }
-    void PerformProjectileAttack()
+    public void PerformProjectileAttack()
     {
         if (projectileAttackTimer > 0)
         {
@@ -851,6 +885,12 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             return;
         }
         if (isProjectileAttacking) return;
+
+        // Behavior Tree 사용 시 공격 상태 설정
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(true);
+        }
 
         StartCoroutine(ProjectileAttackPattern());
          projectileAttackTimer = projectileAttackCooldown;
@@ -874,6 +914,13 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
         
         isProjectileAttacking = false;
+        
+        // Behavior Tree 사용 시 공격 상태 해제
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
+        
         yield return new WaitForSeconds(1f); // 쿨다운
     }
     void FireParticleProjectile()
@@ -1433,6 +1480,13 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     }
     
     isProjectileAttacking = false;
+    
+    // Behavior Tree 사용 시 공격 상태 해제
+    if (useBehaviorTree && houndBehaviorTree != null)
+    {
+        houndBehaviorTree.SetAttacking(false);
+    }
+    
     agent.isStopped = false;
     
     Debug.Log("제자리 투사체 공격 완료!");
@@ -1530,7 +1584,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         }
     }
 
-    void PerformMeleeAttack()
+    public void PerformMeleeAttack()
     {
         if (!IsLookingAtPlayer())
     {
@@ -1538,6 +1592,12 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     }
 
     SafeStopAgent();
+    
+    // Behavior Tree 사용 시 공격 상태 설정
+    if (useBehaviorTree && houndBehaviorTree != null)
+    {
+        houndBehaviorTree.SetAttacking(true);
+    }
     
     // 1페이즈든 2페이즈든 근접 공격만 실행
     int randomAttack = Random.Range(0, 3); // 0~2 (LeftPaw, RightPaw, LickBite)
@@ -1560,7 +1620,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     attackTimer = attackCooldown;
     }
 
-    void PerformJumpAttack()
+    public void PerformJumpAttack()
     {
         if (!IsLookingAtPlayer())
         {
@@ -1572,6 +1632,12 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
             PerformMeleeAttack();
             Debug.Log($"점프 공격 쿨다운 중 (남은 시간: {jumpAttackTimer:F1}초) - 기본 공격으로 대체");
             return;
+        }
+
+        // Behavior Tree 사용 시 공격 상태 설정
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(true);
         }
 
         currentAttackType = HoundAttackType.JumpAttack;
@@ -1720,11 +1786,23 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     public void OnAttackAnimationEnd()
     {
         isAttacking = false;
+        
+        // Behavior Tree 사용 시 공격 상태 해제
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
     }
 
     public void OnWalkAttackEnd()
     {
         isAttacking = false;
+        
+        // Behavior Tree 사용 시 공격 상태 해제
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
     }
 
     public void OnJumpStart()
@@ -1819,6 +1897,12 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         isJumping = false;
         isAttacking = false;
         isJumpingToTarget = false;
+
+        // Behavior Tree 사용 시 공격 상태 해제
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
 
         NavMeshHit hit;
         if (NavMesh.SamplePosition(transform.position, out hit, 5f, NavMesh.AllAreas))
@@ -1923,6 +2007,13 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         isAttacking = false;
         isJumping = false;
         isBackingAway = false;
+        
+        // Behavior Tree 사용 시 공격 상태 해제
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
+        
         soundManager?.PlayShieldPatternSound();
         // 배리어 패턴 실행
         PerformShieldPattern();
