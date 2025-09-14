@@ -1,6 +1,7 @@
     using UnityEngine;
     using UnityEngine.AI;
     using System.Collections;
+    using EnemyAI;
 
     public class GolemAI : MonoBehaviour, IDamageable
     {
@@ -9,7 +10,7 @@
         [SerializeField] public float maxHp = 150f;
         // 현재 체력 
         public float currentHp;
-        private bool isDead = false;
+        private bool isDead = false; public bool IsDead() => isDead;
         [SerializeField] int dropGold = 3000; // 골렘 처치 시 드랍되는 골드 양
 
         [Header("페이즈 설정")]
@@ -19,7 +20,7 @@
 
         [Header("이동 설정")]
         [SerializeField] float walkSpeed = 1.5f;
-        [SerializeField] float phase2WalkSpeed = 2.2f; // 2페이즈 이동속도 증가
+        [SerializeField] float phase2WalkSpeed = 2.2f;
         [SerializeField] float rotationSpeed = 2f;
 
         [Header("공격 설정")]
@@ -99,6 +100,11 @@
         private GolemAttackType currentAttackType;
         PlayerDataManager playerData;
 
+        [Header("Behavior Tree Mode")]
+        [SerializeField] private bool useBehaviorTree = false;
+        private GolemBehaviorTree golemBehaviorTree;
+
+
         void Awake()
         {
             agent = GetComponent<NavMeshAgent>();
@@ -125,7 +131,8 @@
                 if (colliders[i] != null)
                 {
                     colliders[i].gameObject.SetActive(false);
-                    colliders[i].damageAmount = damages[i];
+                    // 수정된 SetDamageSource 호출
+                    colliders[i].SetDamageSource(this, damages[i]);
                 }
             }
         }
@@ -154,6 +161,11 @@
         soundManager = GetComponent<GolemSoundManager>();
         if (soundManager == null)
             soundManager = gameObject.AddComponent<GolemSoundManager>();
+
+        if (useBehaviorTree)
+        {
+            golemBehaviorTree = GetComponent<GolemBehaviorTree>();
+        }
            
         }
 
@@ -170,6 +182,9 @@
         void Update()
         {
             if (isDead || player == null) return;
+
+            // Behavior Tree 모드가 활성화되면 기존 로직 비활성화
+            if (useBehaviorTree) return;
 
             // 2페이즈 전환 체크
             CheckPhase2Transition();
@@ -203,7 +218,7 @@
 
         void CheckPhase2Transition()
         {
-            if (!hasTriggeredPhase2 && currentHp <= maxHp * phase2HpThreshold)
+            if (!isPhase2 && currentHp <= maxHp * phase2HpThreshold)
             {
                 TriggerPhase2();
             }
@@ -232,11 +247,11 @@
 
         void UpdatePhase2Damage()
         {
-            if (leftPunchCollider != null)
-                leftPunchCollider.damageAmount = leftPunchDamage * phase2DamageMultiplier;
-            
-            if (rightPunchCollider != null)
-                rightPunchCollider.damageAmount = rightPunchDamage * phase2DamageMultiplier;
+            // 기존 데미지에 배율을 곱하도록 수정 (0으로 덮어쓰는 문제 방지)
+            if (leftPunchCollider != null && leftPunchCollider.damageAmount > 0)
+                leftPunchCollider.damageAmount *= phase2DamageMultiplier;
+            if (rightPunchCollider != null && rightPunchCollider.damageAmount > 0)
+                rightPunchCollider.damageAmount *= phase2DamageMultiplier;
         }
 
         IEnumerator Phase2TransitionEffect()
@@ -413,7 +428,7 @@
             animator.SetBool("IsMoving", false);
         }
 
-        void PerformWalkAttack()
+        public void PerformWalkAttack()
         {
             isWalkAttacking = true;
             isAttacking = true;
@@ -432,11 +447,12 @@
                 animator.SetTrigger("RightPunch");
             }
 
+            if (useBehaviorTree) golemBehaviorTree.SetAttacking(true);
             attackTimer = isPhase2 ? phase2AttackCooldown : attackCooldown;
             Debug.Log($"이동하면서 공격: {currentAttackType}");
         }
 
-        void PerformStationaryAttack()
+        public void PerformStationaryAttack()
         {
             StopMovement();
             isAttacking = true;
@@ -460,12 +476,13 @@
                     break;
             }
 
+            if (useBehaviorTree) golemBehaviorTree.SetAttacking(true);
             attackTimer = isPhase2 ? phase2AttackCooldown : attackCooldown;
             Debug.Log($"제자리 공격: {currentAttackType}");
         }
 
         // 새로운 연계 공격 (Punch1 → Punch2)
-        void PerformComboAttack()
+        public void PerformComboAttack()
         {
             if (isComboAttacking) return;
             
@@ -478,6 +495,7 @@
         isComboAttacking = true;
         isAttacking = true;
         StopMovement();
+        if (useBehaviorTree) golemBehaviorTree.SetAttacking(true);
 
         // 연계 공격 시작 표시
         animator.SetBool("ComboAttack", true);
@@ -508,6 +526,7 @@
         
         isComboAttacking = false;
         isAttacking = false;
+        if (useBehaviorTree) golemBehaviorTree.SetAttacking(false);
         attackTimer = isPhase2 ? phase2AttackCooldown : attackCooldown;
         
         Debug.Log("연계 공격 완료!");
@@ -521,7 +540,7 @@
     }
 
 
-        void PerformShieldPattern()
+        public void PerformShieldPattern()
         {
             if (isShieldPatternActive || !isPhase2) return; // 2페이즈에서만 사용 가능
             animator.SetBool("ShieldPattern", true);
@@ -535,6 +554,7 @@
         isShieldPatternActive = true;
         animator.SetBool("ShieldPattern", true);
         StopMovement();
+        if (useBehaviorTree) golemBehaviorTree.SetAttacking(true);
 
         // 쉴드 생성
         if (golemShieldPrefab != null)
@@ -589,6 +609,7 @@
 
         animator.SetBool("ShieldPattern", false);
         isShieldPatternActive = false;
+        if (useBehaviorTree) golemBehaviorTree.SetAttacking(false);
         attackTimer = isPhase2 ? phase2AttackCooldown : attackCooldown;
         Debug.Log("쉴드 패턴 완료!");
 
@@ -698,6 +719,7 @@
             isAttacking = false;
             isWalkAttacking = false;
             
+            if (useBehaviorTree) golemBehaviorTree.SetAttacking(false);
             DisableAttackCollider();
             
             animator.ResetTrigger("LeftPunch");
@@ -717,6 +739,7 @@
             isWalkAttacking = false;
             isAttacking = false;
             
+            if (useBehaviorTree) golemBehaviorTree.SetAttacking(false);
             DisableAttackCollider();
             
             animator.SetBool("WalkPunch1", false);
@@ -793,4 +816,9 @@
                 Gizmos.DrawWireCube(transform.position + Vector3.up * 3f, Vector3.one);
             }
         }
+
+        // Behavior Tree에서 사용할 Getter 함수들
+        public bool IsPhase2() => isPhase2;
+        public float GetRotationSpeed() => rotationSpeed;
+
     }

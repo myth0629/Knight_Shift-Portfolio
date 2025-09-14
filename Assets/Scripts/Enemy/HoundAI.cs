@@ -748,8 +748,8 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             if (colliders[i] != null)
             {
                 colliders[i].gameObject.SetActive(false);
-                colliders[i].damageAmount = damages[i];
-                colliders[i].SetDamageSource(this);
+                // 수정된 SetDamageSource 호출
+                colliders[i].SetDamageSource(this, damages[i]);
             }
         }
     }

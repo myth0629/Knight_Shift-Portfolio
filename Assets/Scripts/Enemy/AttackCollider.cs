@@ -5,12 +5,13 @@ public class AttackCollider : MonoBehaviour
 {
     public float damageAmount;
     private bool hasDealtDamage = false;
-    private HoundAI damageSource;
+    private IDamageable damageSource; // HoundAI 대신 범용 IDamageable 인터페이스 사용
     private HashSet<Collider> hitTargets = new HashSet<Collider>();
 
-    public void SetDamageSource(HoundAI source)
+    public void SetDamageSource(IDamageable source, float damage)
     {
         damageSource = source;
+        damageAmount = damage;
     }
 
     void OnTriggerEnter(Collider other)
