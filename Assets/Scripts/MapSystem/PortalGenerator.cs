@@ -139,6 +139,19 @@ public class PortalGenerator : MonoBehaviour
             Debug.LogWarning("Portal component not found on prefab!");
         }
         
+        // 포털 라벨 설정
+        PortalLabel portalLabel = portal.GetComponent<PortalLabel>();
+        if (portalLabel != null)
+        {
+            string portalName = GetPortalNameForNode(node);
+            portalLabel.SetPortalName(portalName);
+            Debug.Log($"Set portal name '{portalName}' for node {node.id}");
+        }
+        else
+        {
+            Debug.LogWarning($"PortalLabel component not found on portal prefab for node {node.id}!");
+        }
+        
         // 딕셔너리에 저장
         spawnedPortals[node.id] = portal;
         
@@ -157,6 +170,43 @@ public class PortalGenerator : MonoBehaviour
             default: 
                 Debug.LogWarning($"No portal prefab defined for node type: {type}");
                 return null; // 기본 예비 프리팹은 사용하지 않음
+        }
+    }
+    
+    /// <summary>
+    /// 노드 타입과 ID에 따라 포털 이름을 생성합니다
+    /// </summary>
+    /// <param name="node">맵 노드</param>
+    /// <returns>포털 이름</returns>
+    private string GetPortalNameForNode(MapNode node)
+    {
+        string baseName = GetNodeTypeName(node.nodeType);
+        
+        // 노드 ID 또는 추가 정보를 포함하여 이름 생성
+        if (node.nodeType == NodeType.Boss)
+        {
+            return $"{baseName}";  // 보스는 단순하게
+        }
+        else
+        {
+            return $"{baseName} #{node.id}";  // 다른 타입들은 ID 포함
+        }
+    }
+    
+    /// <summary>
+    /// 노드 타입에 따른 한국어 이름을 반환합니다
+    /// </summary>
+    /// <param name="type">노드 타입</param>
+    /// <returns>한국어 이름</returns>
+    private string GetNodeTypeName(NodeType type)
+    {
+        switch (type)
+        {
+            case NodeType.Battle: return "전투";
+            case NodeType.Shop: return "상점";
+            case NodeType.Camp: return "휴식지";
+            case NodeType.Boss: return "보스";
+            default: return "포털";
         }
     }
     
