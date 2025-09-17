@@ -125,19 +125,45 @@ namespace MapSystem
         
         public void CreateConnectionTo(MapNodeUI targetNode)
         {
-            if (connectionContainer == null || connectionPrefab == null) return;
+            CreateConnectionTo(targetNode, connectionContainer);
+        }
+
+        // 공유 컨테이너를 지정해 연결선을 생성(아이콘 뒤 배치용)
+        public void CreateConnectionTo(MapNodeUI targetNode, RectTransform sharedContainer)
+        {
+            RectTransform containerToUse = sharedContainer != null ? sharedContainer : connectionContainer;
+            if (containerToUse == null || connectionPrefab == null) return;
             
             // Create a new connection line
-            GameObject connectionObj = Instantiate(connectionPrefab, connectionContainer);
+            GameObject connectionObj = Instantiate(connectionPrefab, containerToUse);
             RectTransform connectionRect = connectionObj.GetComponent<RectTransform>();
             connections.Add(connectionRect);
             
             // 연결선을 계층 구조에서 가장 처음에 배치하여 다른 UI 요소보다 뒤에 표시되도록 함
             connectionObj.transform.SetAsFirstSibling();
             
-            // Get positions in local space
-            Vector2 startPos = Vector2.zero; // Local space, so this node is at origin
-            Vector2 endPos = targetNode.GetComponent<RectTransform>().anchoredPosition - GetComponent<RectTransform>().anchoredPosition;
+            // Get positions converted into the container's local space
+            RectTransform thisRect = GetComponent<RectTransform>();
+            RectTransform targetRect = targetNode.GetComponent<RectTransform>();
+
+            Vector2 startLocalInMap;
+            Vector2 endLocalInMap;
+            RectTransform mapRoot = containerToUse;
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                mapRoot,
+                RectTransformUtility.WorldToScreenPoint(null, thisRect.position),
+                null,
+                out startLocalInMap);
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                mapRoot,
+                RectTransformUtility.WorldToScreenPoint(null, targetRect.position),
+                null,
+                out endLocalInMap);
+
+            Vector2 startPos = startLocalInMap;
+            Vector2 endPos = endLocalInMap;
             
             // Calculate distance and angle
             float distance = Vector2.Distance(startPos, endPos);
@@ -145,7 +171,7 @@ namespace MapSystem
             
             // Set line position, size and rotation
             connectionRect.sizeDelta = new Vector2(distance, connectionRect.sizeDelta.y);
-            connectionRect.anchoredPosition = startPos + (endPos - startPos) / 2f;
+            connectionRect.anchoredPosition = (startPos + endPos) * 0.5f;
             connectionRect.localRotation = Quaternion.Euler(0, 0, angle);
             
             // Set color based on accessibility
@@ -171,11 +197,19 @@ namespace MapSystem
         
         private void Update()
         {
-            if (isAccessible)
+            // 현재 노드에만 펄스 애니메이션 적용
+            if (nodeData != null && nodeData.isCurrent)
             {
-                // Pulse animation for accessible nodes
                 float pulse = 1f + Mathf.Sin(Time.time * pulseSpeed) * pulseSize;
                 transform.localScale = Vector3.one * pulse;
+            }
+            else
+            {
+                // 현재 노드가 아니면 기본 크기로 복구
+                if (transform.localScale != Vector3.one)
+                {
+                    transform.localScale = Vector3.one;
+                }
             }
         }
         

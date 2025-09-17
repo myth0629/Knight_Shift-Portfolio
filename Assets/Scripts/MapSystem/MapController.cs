@@ -192,39 +192,95 @@ namespace MapSystem
             layerGrid[totalLayers - 1].Add(bossNode);
             mapNodes.Add(bossNode);
             
-            // 3. 중간 층에 노드 분포
+            // 3. 중간 층에 노드 분포 (레이어 내 노드 타입 유일성 보장 + Camp/Shop 연속 금지)
             for (int layer = 1; layer < totalLayers - 1; layer++)
             {
                 // 각 층에 몇 개의 노드를 생성할지 결정
-                int nodesInLayer = UnityEngine.Random.Range(minNodesPerLayer, maxNodesPerLayer + 1);
-                
+                int requestedNodesInLayer = UnityEngine.Random.Range(minNodesPerLayer, maxNodesPerLayer + 1);
+
+                // 이 레이어에서 사용할 수 있는 타입 목록 구성 (Start/Boss 제외)
+                List<NodeType> availableTypes = new List<NodeType> { NodeType.Battle, NodeType.Camp, NodeType.Shop };
+
+                // 상점은 초반 레이어 우선: 너무 늦은 레이어라면 후보에서 제거 (유일성 보장을 위해)
+                if (layer > totalLayers - shopEarlyLayerLimit)
+                {
+                    availableTypes.Remove(NodeType.Shop);
+                }
+
+                // 바로 이전 레이어에 등장한 Camp/Shop은 이번 레이어에 반복 금지
+                if (layer - 1 >= 0)
+                {
+                    var prevLayerTypes = new HashSet<NodeType>(layerGrid[layer - 1].Select(n => n.nodeType));
+                    if (prevLayerTypes.Contains(NodeType.Camp))
+                    {
+                        availableTypes.Remove(NodeType.Camp);
+                    }
+                    if (prevLayerTypes.Contains(NodeType.Shop))
+                    {
+                        availableTypes.Remove(NodeType.Shop);
+                    }
+                }
+
+                // 유일성 보장을 위해 생성 가능한 최대 노드 수는 사용 가능한 타입 수로 제한
+                int maxUniqueForLayer = Mathf.Max(0, availableTypes.Count);
+                int nodesInLayer = Mathf.Min(requestedNodesInLayer, maxUniqueForLayer);
+
+                if (nodesInLayer < requestedNodesInLayer)
+                {
+                    Debug.Log($"[MapGen] Layer {layer}: 요청된 노드 수 {requestedNodesInLayer} 중 {nodesInLayer}개만 생성 (레이어 내 타입 유일성 제한)");
+                }
+
+                // 보스 전층에는 캠프/상점 포함 규칙 적용: 해당 타입이 후보에 없다면 캠프는 강제로 포함
+                bool isPreBossLayer = (layer == totalLayers - 2);
+                List<NodeType> selectedTypes = new List<NodeType>();
+
+                if (nodesInLayer > 0)
+                {
+                    // 먼저 무작위로 타입 셔플
+                    availableTypes = availableTypes.OrderBy(_ => UnityEngine.Random.value).ToList();
+
+                    if (isPreBossLayer && placeShopOrCampBeforeBoss)
+                    {
+                        // 가능한 경우 상점/캠프 중 하나를 우선 선택
+                        List<NodeType> preferred = new List<NodeType>();
+                        if (availableTypes.Contains(NodeType.Shop)) preferred.Add(NodeType.Shop);
+                        if (availableTypes.Contains(NodeType.Camp)) preferred.Add(NodeType.Camp);
+
+                        if (preferred.Count > 0)
+                        {
+                            NodeType forced = preferred[UnityEngine.Random.Range(0, preferred.Count)];
+                            selectedTypes.Add(forced);
+                            availableTypes.Remove(forced);
+                        }
+                        else
+                        {
+                            // 이전 레이어에 Camp/Shop이 모두 등장해 필터링된 경우, 강제 포함을 생략하고 로그로 안내
+                            Debug.Log($"[MapGen] Pre-Boss 레이어 {layer}: 이전 레이어와의 연속 금지 규칙으로 인해 Camp/Shop 강제 포함을 생략합니다.");
+                        }
+                    }
+
+                    // 남은 타입에서 부족분 채우기
+                    int remaining = Mathf.Max(0, nodesInLayer - selectedTypes.Count);
+                    for (int i = 0; i < remaining && i < availableTypes.Count; i++)
+                    {
+                        selectedTypes.Add(availableTypes[i]);
+                    }
+                }
+
                 // 노드 간 간격 설정
                 float spacing = 3.0f;
-                
-                for (int i = 0; i < nodesInLayer; i++)
+
+                // 선택된 타입들로 노드 생성 (depth는 0부터 순서대로)
+                for (int i = 0; i < selectedTypes.Count; i++)
                 {
-                    // 노드 타입 결정 (비율에 따라)
-                    NodeType nodeType = DetermineNodeType(layer);
-                    
-                    // 특수 규칙 적용
-                    // 보스 전층(layer==1)은 캠프나 상점 포함
-                    if (layer == 1 && placeShopOrCampBeforeBoss && i == 0)
-                    {
-                        nodeType = UnityEngine.Random.value < 0.5f ? NodeType.Camp : NodeType.Shop;
-                    }
-                    
-                    // 상점은 초반 2~3층에만 배치
-                    if (nodeType == NodeType.Shop && layer > totalLayers - shopEarlyLayerLimit)
-                    {
-                        nodeType = NodeType.Camp;
-                    }
-                    
+                    NodeType nodeType = selectedTypes[i];
+
                     MapNode node = CreateNode(nodeType, layer, i);
-                    
-                    float xOffset = (i - (nodesInLayer - 1) / 2.0f) * spacing;
-                    float yOffset = (totalLayers - 1 -layer) * -1.5f; // Y 위치는 층에 따라 조정
+
+                    float xOffset = (i - (selectedTypes.Count - 1) / 2.0f) * spacing;
+                    float yOffset = (totalLayers - 1 - layer) * -1.5f; // Y 위치는 층에 따라 조정
                     node.position = new Vector2(xOffset, yOffset);
-                    
+
                     layerGrid[layer].Add(node);
                     mapNodes.Add(node);
                 }
@@ -246,6 +302,12 @@ namespace MapSystem
             currentNode = startNode;
             startNode.isAccessible = true;
             startNode.isCurrent = true;
+
+            // 7. 레이어별 타입 유일성 검증 (디버그)
+            ValidatePerLayerUniqueness();
+
+            // 8. 인접 레이어 간 Camp/Shop 연속 금지 검증 (디버그)
+            ValidateNoConsecutiveCampShop();
         }
         
         private NodeType DetermineNodeType(int layer)
@@ -408,6 +470,56 @@ namespace MapSystem
                 string connections = string.Join(", ", node.childNodeIds);
                 Debug.Log($"Node {node.id} (Type: {node.nodeType}, Layer: {node.layer}, Depth: {node.depth}) " +
                           $"connects to: [{connections}]");
+            }
+        }
+
+        // 레이어별로 노드 타입이 유일한지 확인 (Start/Boss 제외)
+        private void ValidatePerLayerUniqueness()
+        {
+            var grouped = mapNodes
+                .Where(n => n.nodeType != NodeType.Start && n.nodeType != NodeType.Boss)
+                .GroupBy(n => n.layer);
+
+            foreach (var layerGroup in grouped)
+            {
+                var types = layerGroup.Select(n => n.nodeType).ToList();
+                var distinctTypes = types.Distinct().ToList();
+                if (types.Count != distinctTypes.Count)
+                {
+                    Debug.LogWarning($"[MapGen] 레이어 {layerGroup.Key}에서 노드 타입 중복 감지: {string.Join(", ", types)}");
+                }
+                else
+                {
+                    Debug.Log($"[MapGen] 레이어 {layerGroup.Key} 타입 유일성 OK: {string.Join(", ", distinctTypes)}");
+                }
+            }
+        }
+
+        // 인접 레이어 간 Camp/Shop 연속 배치를 방지하는 검증
+        private void ValidateNoConsecutiveCampShop()
+        {
+            // 레이어별 타입 집합 구성
+            var byLayer = mapNodes
+                .GroupBy(n => n.layer)
+                .ToDictionary(g => g.Key, g => new HashSet<NodeType>(g.Select(n => n.nodeType)));
+
+            for (int layer = 1; layer < totalLayers - 1; layer++)
+            {
+                if (!byLayer.ContainsKey(layer) || !byLayer.ContainsKey(layer - 1)) continue;
+
+                bool prevHadCamp = byLayer[layer - 1].Contains(NodeType.Camp);
+                bool prevHadShop = byLayer[layer - 1].Contains(NodeType.Shop);
+                bool currHasCamp = byLayer[layer].Contains(NodeType.Camp);
+                bool currHasShop = byLayer[layer].Contains(NodeType.Shop);
+
+                if (prevHadCamp && currHasCamp)
+                {
+                    Debug.LogWarning($"[MapGen] 레이어 {layer-1}와 {layer}에 Camp가 연속 배치되었습니다.");
+                }
+                if (prevHadShop && currHasShop)
+                {
+                    Debug.LogWarning($"[MapGen] 레이어 {layer-1}와 {layer}에 Shop이 연속 배치되었습니다.");
+                }
             }
         }
         

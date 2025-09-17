@@ -9,8 +9,10 @@ namespace MapSystem
     public class MapUIManager : MonoBehaviour
     {
         [Header("Map UI References")]
-        [SerializeField] private RectTransform mapContainer;
+    [SerializeField] private RectTransform mapContainer;
+    [SerializeField] private RectTransform mapPanel; // Connections를 붙일 상위 패널 ("Map panel")
         [SerializeField] private GameObject nodeUIPrefab;
+        [SerializeField] private RectTransform connectionsContainer; // 연결선 전용 컨테이너 (아이콘 뒤)
         [SerializeField] private GameObject tooltipPanel;
         [SerializeField] private TextMeshProUGUI tooltipTitle;
         [SerializeField] private TextMeshProUGUI tooltipDescription;
@@ -69,6 +71,10 @@ namespace MapSystem
             Debug.Log("Initializing map UI");
             // Clear existing nodes
             ClearMapUI();
+
+            // Ensure a shared connections container exists and is behind nodes
+            EnsureConnectionsContainer();
+            ClearConnectionsContainer();
             
             // Get all nodes from controller
             List<MapNode> allNodes = mapController.GetAllNodes();
@@ -101,6 +107,51 @@ namespace MapSystem
             }
             
             nodeUIElements.Clear();
+        }
+
+        private void EnsureConnectionsContainer()
+        {
+            // Prefer placing Connections under a specific "Map panel" if available
+            if (mapPanel == null)
+            {
+                var panelGo = GameObject.Find("Map panel") ?? GameObject.Find("Map Panel");
+                if (panelGo != null)
+                {
+                    mapPanel = panelGo.GetComponent<RectTransform>();
+                }
+            }
+
+            RectTransform parentForConnections = mapPanel != null ? mapPanel : mapContainer;
+            if (parentForConnections == null) return;
+
+            if (connectionsContainer == null)
+            {
+                var go = new GameObject("Connections", typeof(RectTransform));
+                connectionsContainer = go.GetComponent<RectTransform>();
+                connectionsContainer.SetParent(parentForConnections, false);
+                // Stretch to match parent for unified coordinate space
+                connectionsContainer.anchorMin = Vector2.zero;
+                connectionsContainer.anchorMax = Vector2.one;
+                connectionsContainer.offsetMin = Vector2.zero;
+                connectionsContainer.offsetMax = Vector2.zero;
+                connectionsContainer.anchoredPosition = Vector2.zero;
+            }
+            else if (connectionsContainer.parent as RectTransform != parentForConnections)
+            {
+                connectionsContainer.SetParent(parentForConnections, false);
+            }
+
+            // Put it at the back so lines render behind nodes
+            connectionsContainer.SetAsFirstSibling();
+        }
+
+        private void ClearConnectionsContainer()
+        {
+            if (connectionsContainer == null) return;
+            for (int i = connectionsContainer.childCount - 1; i >= 0; i--)
+            {
+                Destroy(connectionsContainer.GetChild(i).gameObject);
+            }
         }
         
         private void CreateNodeUI(MapNode node)
@@ -142,7 +193,7 @@ namespace MapSystem
             {
                 if (nodeUIElements.TryGetValue(node.id, out MapNodeUI sourceNodeUI))
                 {
-                    // Clear existing connections
+                    // Clear existing connections (legacy per-node) - safe no-op if unused
                     sourceNodeUI.ClearConnections();
                     
                     // Create connections to all connected nodes
@@ -150,7 +201,8 @@ namespace MapSystem
                     {
                         if (nodeUIElements.TryGetValue(connectedId, out MapNodeUI targetNodeUI))
                         {
-                            sourceNodeUI.CreateConnectionTo(targetNodeUI);
+                            // Create connection under the shared connections container so it renders behind nodes
+                            sourceNodeUI.CreateConnectionTo(targetNodeUI, connectionsContainer);
                         }
                     }
                 }
