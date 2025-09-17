@@ -18,7 +18,7 @@ EditorBuildSettings:
     path: Assets/Scenes/GameScene/Camp.unity
     guid: 9c0f97449f9bc480ea80961a475ebb40
   - enabled: 1
-    path: Assets/Scenes/GameScene/Battle.unity
+    path: Assets/Scenes/GameScene/Battle-Cave.unity
     guid: 6acc7e58ec758455cbb4adacb8463ffc
   - enabled: 1
     path: Assets/Scenes/GameScene/Boss - 1.unity
