@@ -16,4 +16,4 @@ MonoBehaviour:
   weaponType: 1
   damage: 25
   weaponModelPrefab: {fileID: 8442185660769940636, guid: 7a0c11fee23b943398f91cb263117a3d, type: 3}
-  tier: 0
+  tier: 4

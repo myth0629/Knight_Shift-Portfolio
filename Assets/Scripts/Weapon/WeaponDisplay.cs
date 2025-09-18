@@ -10,6 +10,7 @@ public class WeaponDisplay : MonoBehaviour
 
     private GameObject spawnedWeapon;
     private GameObject assignedWeaponPrefab;
+    private int upgradeLevel = 0;
 
     public WeaponManager weaponManager;
     UIManager uiManager;
@@ -28,6 +29,17 @@ public class WeaponDisplay : MonoBehaviour
     }
 
     public void DisplaySetWeapon(WeaponData weaponData)
+    {
+        InternalDisplaySetWeapon(weaponData, false);
+    }
+
+    // 선택창에서 현재 장착중인 무기에 대해 다음 강화 예상(+1) 표시용
+    public void DisplaySetWeapon(WeaponData weaponData, bool previewNextUpgrade)
+    {
+        InternalDisplaySetWeapon(weaponData, previewNextUpgrade);
+    }
+
+    private void InternalDisplaySetWeapon(WeaponData weaponData, bool previewNext)
     {
         if (weaponManager == null)
         {
@@ -50,7 +62,16 @@ public class WeaponDisplay : MonoBehaviour
         // 무기 이름 표시
         if (weaponData != null)
         {
-            weaponNameText.text = weaponData.weaponName;
+            upgradeLevel = WeaponUpgradeSystem.Instance != null ? WeaponUpgradeSystem.Instance.GetLevel(weaponData) : 0;
+            int displayLevel = upgradeLevel;
+            if (previewNext && WeaponUpgradeSystem.Instance != null)
+            {
+                int max = WeaponUpgradeSystem.Instance.maxLevel;
+                int nextLevel = upgradeLevel + 1;
+                if (max > 0) nextLevel = Mathf.Min(nextLevel, max);
+                displayLevel = nextLevel;
+            }
+            weaponNameText.text = FormatWeaponName(weaponData.weaponName, displayLevel);
         }
         else
         {
@@ -64,7 +85,28 @@ public class WeaponDisplay : MonoBehaviour
             selectButton.onClick.RemoveAllListeners();
             selectButton.onClick.AddListener(() =>
             {
-                weaponManager.EquipWeapon(weaponData);
+                // 현재 장착 무기와 같은 무기를 선택하면 강화
+                var currentWeaponDataField = weaponManager.GetType().GetField("currentWeaponData", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                WeaponData equipped = null;
+                if (currentWeaponDataField != null)
+                {
+                    equipped = currentWeaponDataField.GetValue(weaponManager) as WeaponData;
+                }
+
+                if (equipped == weaponData)
+                {
+                    if (WeaponUpgradeSystem.Instance != null)
+                    {
+                        WeaponUpgradeSystem.Instance.Upgrade(weaponData, 1);
+                        // 이름 재표시
+                        weaponNameText.text = FormatWeaponName(weaponData.weaponName, WeaponUpgradeSystem.Instance.GetLevel(weaponData));
+                    }
+                }
+                else
+                {
+                    weaponManager.EquipWeapon(weaponData);
+                }
+
                 uiManager.ToggleUpgradeUIPanel();
             });
         }
@@ -72,5 +114,18 @@ public class WeaponDisplay : MonoBehaviour
         {
             Debug.LogWarning("무기 정보 또는 weaponManager가 null입니다.");
         }
+    }
+
+    private string FormatWeaponName(string baseName, int level)
+    {
+        if (level <= 0) return baseName;
+        return $"{baseName} +{level}";
+    }
+
+    public void RefreshUpgradeLevel()
+    {
+        if (assignedWeaponPrefab == null || weaponNameText == null) return;
+        // We don't store WeaponData directly here; caller should re-call DisplaySetWeapon if data changed.
+        // This method kept for potential extension.
     }
 }
