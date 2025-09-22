@@ -58,6 +58,13 @@ public class WeaponManager : MonoBehaviour
             currentWeapon.ApplyWeaponTypeToAnimator(animator);
 
             Debug.Log($"무기 변경됨: {newWeaponData.weaponName}, 타입: {newWeaponData.weaponType}");
+            
+            // PlayerUI를 통해 StatusUI에 무기 변경 알림
+            PlayerUI playerUI = FindFirstObjectByType<PlayerUI>();
+            if (playerUI != null && playerUI.statusUI != null)
+            {
+                playerUI.statusUI.ForceUpdateWeaponInfo();
+            }
         }
         else
         {

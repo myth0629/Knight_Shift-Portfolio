@@ -35,15 +35,6 @@ public class UIManager : MonoBehaviour
         return null;
     }
     
-    // 테스트용 
-    // void Update()
-    // {
-    //     if (Input.GetKeyDown(KeyCode.E))
-    //     {
-    //         ToggleUpgradeUIPanel();
-    //     }
-    // }
-
     public void ToggleUpgradeUIPanel()
     {
         isPanelOpen = !isPanelOpen;
