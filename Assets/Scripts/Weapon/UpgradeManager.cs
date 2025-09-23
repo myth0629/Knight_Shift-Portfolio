@@ -20,6 +20,9 @@ public class UpgradeManager : MonoBehaviour
             return;
         }
 
+        // 현재 장착 무기 자동 동기화 (외부에서 미지정 대비)
+        ResolveCurrentWeaponData();
+
         ShowRandomUpgrades();
     }
 
@@ -31,6 +34,9 @@ public class UpgradeManager : MonoBehaviour
             Debug.LogWarning("[UpgradeManager] allWeapons 비어있음");
             return;
         }
+
+        // 장착 무기 최신화 시도
+        ResolveCurrentWeaponData();
 
         int currentTier = currentWeapon != null ? currentWeapon.tier : 1; // 기본 1티어로 가정
 
@@ -46,15 +52,10 @@ public class UpgradeManager : MonoBehaviour
             }
         }
 
+        // Fallback 제거: 요구사항상 현재 티어 또는 +1만 허용. 조건에 맞는 무기가 없다면 슬롯을 비활성화 상태로 둡니다.
         if (candidates.Count == 0)
         {
-            Debug.LogWarning($"[UpgradeManager] 조건(tier {currentTier} 또는 {currentTier+1})에 맞는 무기가 없습니다.");
-            // fallback: 모든 무기 중 currentTier 이상 것 사용
-            foreach (var w in allWeapons)
-            {
-                if (w != null && w.tier >= currentTier)
-                    candidates.Add(w);
-            }
+            Debug.LogWarning($"[UpgradeManager] 조건(tier {currentTier} 또는 {currentTier+1})에 맞는 무기가 allWeapons에 없습니다. 슬롯을 비활성화합니다.");
         }
 
         // 2) 후보 수가 슬롯 수보다 적으면 중복 허용 여부 고려
@@ -120,6 +121,19 @@ public class UpgradeManager : MonoBehaviour
             {
                 displaySlots[slotIndex].gameObject.SetActive(false);
             }
+        }
+    }
+
+    // 현재 플레이어가 사용중인 무기의 WeaponData를 가져와 currentWeapon에 반영
+    private void ResolveCurrentWeaponData()
+    {
+        if (currentWeapon != null) return;
+
+        var wm = WeaponManager.Instance;
+        if (wm != null && wm.currentWeapon != null && wm.currentWeapon.weaponData != null)
+        {
+            currentWeapon = wm.currentWeapon.weaponData;
+            Debug.Log($"[UpgradeManager] 현재 장착 무기 자동 인식: {currentWeapon.weaponName} (tier {currentWeapon.tier})");
         }
     }
 }

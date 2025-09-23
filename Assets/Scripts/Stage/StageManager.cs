@@ -25,6 +25,10 @@ public class StageManager : MonoBehaviour
     [Header("씬 설정")]
     [SerializeField] private string startSceneName = "Start";
 
+    [Header("클리어 후 이동 지연")]
+    [Tooltip("보스 처치 후 Start 씬으로 이동하기 전에 대기할 시간 (초)")]
+    [SerializeField] private float delayAfterBossDefeat = 5f;
+
     private const string StageLevelKey = "StageLevel";
 
     public event Action<int> OnStageStarted;    // 스테이지 시작시 (스테이지 번호)
@@ -112,7 +116,18 @@ public class StageManager : MonoBehaviour
         PlayerPrefs.SetInt(StageLevelKey, currentStage);
         PlayerPrefs.Save();
 
-        // Start 씬으로 이동하여 루틴을 처음부터 반복
+        // 지연 후 Start 씬으로 이동하여 루틴을 처음부터 반복
+        StartCoroutine(LoadStartSceneAfterDelay());
+    }
+
+    private IEnumerator LoadStartSceneAfterDelay()
+    {
+        float wait = Mathf.Max(0f, delayAfterBossDefeat);
+        if (wait > 0f)
+        {
+            yield return new WaitForSeconds(wait);
+        }
+
         if (!string.IsNullOrEmpty(startSceneName))
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene(startSceneName);
