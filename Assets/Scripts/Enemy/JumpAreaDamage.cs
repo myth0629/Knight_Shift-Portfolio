@@ -31,6 +31,20 @@ public class JumpAreaDamage : MonoBehaviour
         ApplyAreaDamage();
     }
 
+    // 데미지를 지연시키는 새로운 초기화 메서드
+    public void InitializeWithDelay(float areaDamage, float areaRadius, float delay)
+    {
+        damage = areaDamage;
+        radius = areaRadius;
+        Debug.Log($"===== 지연 범위 데미지 초기화 (딜레이: {delay}초) =====");
+        StartCoroutine(ApplyDamageAfterDelay(delay));
+    }
+
+    private IEnumerator ApplyDamageAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        ApplyAreaDamage();
+    }
     private void ApplyAreaDamage()
     {
         if (hasDamageApplied) return;
@@ -56,7 +70,26 @@ public class JumpAreaDamage : MonoBehaviour
         hasDamageApplied = true;
         
         // 파티클 효과가 끝나면 오브젝트 제거
-        Destroy(gameObject, 2f); // 파티클 지속 시간에 맞춰 조정
+        // 코루틴을 사용하여 파티클이 끝난 후 오브젝트를 제거합니다.
+        StartCoroutine(DestroyAfterParticles());
+    }
+
+    private IEnumerator DestroyAfterParticles()
+    {
+        ParticleSystem ps = GetComponentInChildren<ParticleSystem>();
+        if (ps != null)
+        {
+            // 파티클 시스템의 모든 파티클이 사라질 때까지 기다립니다.
+            yield return new WaitWhile(() => ps.IsAlive(true));
+        }
+        else
+        {
+            // 파티클 시스템이 없는 경우를 대비해 기본 2초 대기
+            yield return new WaitForSeconds(2f);
+        }
+
+        // 파티클 재생이 완전히 끝난 후 오브젝트를 제거합니다.
+        Destroy(gameObject);
     }
 
     private void OnDrawGizmos()

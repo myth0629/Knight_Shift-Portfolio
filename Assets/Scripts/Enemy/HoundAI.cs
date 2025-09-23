@@ -9,8 +9,9 @@ public class HoundAI : MonoBehaviour, IDamageable
     [SerializeField] public float maxHp = 100f;
     public float currentHp;
     private bool isDead = false;
+    private bool isInvincible = false; // 무적 상태 플래그
 
-    [SerializeField] int dropGold = 3000; // 골렘 처치 시 드랍되는 골드 양
+    [SerializeField] int dropGold = 3000; 
 
     [Header("보스 설정")]
     [SerializeField] bool isBoss = true;
@@ -47,9 +48,20 @@ public class HoundAI : MonoBehaviour, IDamageable
     private bool hasFallingTriggered = false;
     [Header("공격 쿨다운 설정")]
     [SerializeField] private float chargeAttackCooldown = 5f;    // 돌진 쿨다운
-    [SerializeField] private float projectileAttackCooldown = 4f; // 투사체 쿨다운
+    [SerializeField] private float projectileAttackCooldown = 6f; // 투사체 쿨다운
     private float chargeAttackTimer = 0f;
     private float projectileAttackTimer = 0f;
+
+    [Header("영혼 화살비 (Spirit Arrow Rain) 설정 - 2페이즈 원거리")]
+    [SerializeField] private GameObject spiritArrowPrefab; // 화살비용 투사체 프리팹
+    [SerializeField] private int spiritArrowCount = 5; // 발사할 투사체 개수
+    [SerializeField] private float spiritArrowSpreadAngle = 45f; // 부채꼴 각도
+    [SerializeField] private float spiritArrowSpeed = 10f;
+    [SerializeField] private float spiritArrowDamage = 8f;
+    [SerializeField] private float spiritArrowCooldown = 12f;
+    private bool isFiringSpiritArrows = false;
+    private float spiritArrowTimer = 0f;
+
     [Header("점프 공격 쿨다운")]
     [SerializeField] private float jumpAttackCooldown = 4f; // 점프 공격 쿨다운 시간
     private float jumpAttackTimer = 0f; // 점프 공격 타이머
@@ -96,23 +108,6 @@ public class HoundAI : MonoBehaviour, IDamageable
     private bool isRotatingToAttack = false;
     private float rotationTimer = 0f;
 
-    [Header("파티클 쉴드 패턴 설정")]
-    [SerializeField] GameObject houndShieldPrefab;
-    [SerializeField] GameObject safeZonePrefab;
-    [SerializeField] GameObject dangerAreaPrefab;
-    [SerializeField] float safeZoneRadius = 1f; // 안전장판 반경
-    [SerializeField] float dangerAreaSize = 100f; // 위험지대 크기 (새로 추가)
-    [SerializeField] float maxSafeZoneDistance = 15f; // 최대 안전장판 거리
-    [SerializeField] float minSafeZoneDistance = 8f; // 최소 안전장판 거리
-    [SerializeField] float patternDuration = 5f; // 패턴 지속 시간
-    [SerializeField] float massiveDamage = 35f; // 안전장판 밖에 있을 때 플레이어에게 주는 데미지
-
-    private bool isShieldPatternActive = false;
-    private GameObject houndShield;
-    private GameObject safeZoneEffect;
-    private GameObject dangerAreaEffect;
-    private Vector3 safeZonePosition;
-
     [Header("행동 확률 설정")]
     [SerializeField] float retreatProbability = 0.05f;
     [SerializeField] float stayAndAttackProbability = 0.95f;
@@ -136,6 +131,7 @@ public class HoundAI : MonoBehaviour, IDamageable
     private bool isJumping = false;
     private bool isBackingAway = false;
     private bool isRecoveringFromJump = false;
+    private bool isRetreatingForAttack = false;
 
     [Header("레이어 관리")]
     [SerializeField] float upperBodyLayerWeight = 1f;
@@ -154,7 +150,7 @@ public class HoundAI : MonoBehaviour, IDamageable
     [SerializeField] float phase2AttackSpeedMultiplier = 0.8f;
 
     [Header("페이즈 전환 설정")]
-    [SerializeField] bool isPhaseTransitionTriggered = false; // 전환 트리거 여부
+    [SerializeField] public bool isPhaseTransitionTriggered = false; // 전환 트리거 여부
     [SerializeField] GameObject phase2AuraPrefab; // 오라 파티클 프리팹
     [SerializeField] float auraEffectDuration = 3f; // 오라 지속 시간
 
@@ -206,6 +202,15 @@ public class HoundAI : MonoBehaviour, IDamageable
     
     private GameObject currentAuroraEffect;
 
+    [Header("2페이즈 전환 패턴 (바닥 물기)")]
+    [SerializeField] private GameObject houndShieldPrefab; // 2페이즈 전환 시 사용할 쉴드 프리팹
+    private GameObject houndShield; // 쉴드 인스턴스
+    [SerializeField] private GameObject floorBitePrefab; // 바닥에서 솟아나는 물기 이펙트 프리팹
+    [SerializeField] private float floorBiteDamage = 25f;
+    [SerializeField] private float floorBiteDamageDelay = 6.0f; // 장판 생성 후 실제 데미지까지의 딜레이
+    [SerializeField] private float floorBiteInterval = 6.0f; // 물기 공격 간격
+    [SerializeField] private int floorBiteCount = 3; // 물기 공격 횟수
+
     [Header("점프 공격 범위 데미지 설정")]
     [SerializeField] GameObject jumpAreaEffectPrefab;
     [SerializeField] float jumpAreaRadius = 4f;
@@ -247,6 +252,8 @@ public class HoundAI : MonoBehaviour, IDamageable
     }
     public void PerformChargeAttack()
     {
+        if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
+
         if (chargeAttackTimer > 0)
         {
             // 돌진이 불가능할 경우 기본 공격
@@ -357,201 +364,6 @@ public class HoundAI : MonoBehaviour, IDamageable
             elapsed += Time.deltaTime;
             yield return null;
         }
-    }
-
-    void PerformShieldPattern()
-    {
-        
-        if (isShieldPatternActive) return;
-        isShieldPatternActive = true;
-        Debug.Log("하운드 쉴드 + 안전장판 패턴 시작!");
-        StartCoroutine(ShieldAndSafeZonePattern());
-        
-    }
-
-    IEnumerator ShieldAndSafeZonePattern()
-    {
-        isShieldPatternActive = true;
-        // 쉴드 생성
-        if (houndShieldPrefab != null)
-        {
-            houndShield = Instantiate(houndShieldPrefab, transform.position, Quaternion.identity);
-            houndShield.transform.SetParent(transform);
-            Debug.Log("하운드 쉴드 생성!");
-        }
-
-        SafeStopAgent();
-        agent.isStopped = true;
-        Debug.Log("하운드 이동 금지!");
-
-        safeZonePosition = GetRandomSafeZonePosition();
-        if (safeZonePrefab != null)
-        {
-            safeZoneEffect = Instantiate(safeZonePrefab, safeZonePosition, Quaternion.identity);
-            AdjustSafeZoneParticleSize(safeZoneEffect, safeZoneRadius);
-            Debug.Log($"안전장판 생성! 위치: {safeZonePosition}, 반경: {safeZoneRadius}m");
-        }
-
-        if (dangerAreaPrefab != null)
-        {
-            dangerAreaEffect = Instantiate(dangerAreaPrefab, transform.position, Quaternion.identity);
-            Debug.Log("데미지장판 생성 (5초 후 활성화)");
-            ParticleSystem[] dangerParticles = dangerAreaEffect.GetComponentsInChildren<ParticleSystem>();
-            foreach (ParticleSystem ps in dangerParticles)
-            {
-                if (ps != null)
-                {
-                    var shape = ps.shape;
-
-                    // 검색 결과 5번 적용: Shape 타입에 따른 크기 조정
-                    if (shape.shapeType == ParticleSystemShapeType.Box)
-                    {
-                        shape.scale = new Vector3(dangerAreaSize, 2f, dangerAreaSize); // 100x100 크기
-                    }
-                    else if (shape.shapeType == ParticleSystemShapeType.Circle)
-                    {
-                        shape.radius = dangerAreaSize * 0.5f; // 반경 50m
-                    }
-                    else if (shape.shapeType == ParticleSystemShapeType.Sphere)
-                    {
-                        shape.radius = dangerAreaSize * 0.5f; // 반경 50m
-                    }
-
-                    Debug.Log($"위험지대 파티클 크기 조정: {dangerAreaSize}x{dangerAreaSize}");
-                }
-                
-            }
-            
-    
-        }
-        //전체 이펙트 크기도 조정
-        dangerAreaEffect.transform.localScale = Vector3.one * (dangerAreaSize / 50f); // 기본 50 기준으로 스케일링
-        
-        Debug.Log($"대형 위험지대 생성! 크기: {dangerAreaSize}x{dangerAreaSize}");
-    
-
-        
-
-        yield return new WaitForSeconds(patternDuration);
-
-        CheckPlayerSafetyAndDamage();
-
-        yield return new WaitForSeconds(1f);
-
-            if (isPhaseTransitionTriggered && !isPhase2)
-        {
-            StartPhase2WithAura();
-        }
-        if (houndShield != null)
-        {
-            Destroy(houndShield);
-            Debug.Log("하운드 쉴드 제거!");
-        }
-
-        if (safeZoneEffect != null)
-        {
-            Destroy(safeZoneEffect);
-            Debug.Log("안전장판 제거!");
-        }
-
-        if (dangerAreaEffect != null)
-        {
-            Destroy(dangerAreaEffect);
-            Debug.Log("데미지장판 제거!");
-        }
-
-        agent.isStopped = false;
-        Debug.Log("하운드 이동 재개!");
-
-        isShieldPatternActive = false;
-        attackTimer = attackCooldown * 2f;
-        Debug.Log("쉴드 패턴 완료!");
-    }
-    void AdjustSafeZoneParticleSize(GameObject safeZoneEffect, float radius)
-{
-    ParticleSystem[] particles = safeZoneEffect.GetComponentsInChildren<ParticleSystem>();
-    
-    foreach (ParticleSystem ps in particles)
-    {
-        if (ps != null)
-        {
-            // Scaling Mode를 Local로 설정
-            var main = ps.main;
-            main.scalingMode = ParticleSystemScalingMode.Local;
-            
-            // Shape 크기 조정
-            var shape = ps.shape;
-            
-            if (shape.shapeType == ParticleSystemShapeType.Circle)
-            {
-                shape.radius = radius; // 원형이면 반지름 설정
-            }
-            else if (shape.shapeType == ParticleSystemShapeType.Box)
-            {
-                shape.scale = new Vector3(radius * 2f, shape.scale.y, radius * 2f); // 박스면 가로세로 설정
-            }
-            else if (shape.shapeType == ParticleSystemShapeType.Sphere)
-            {
-                shape.radius = radius; // 구형이면 반지름 설정
-            }
-            
-            Debug.Log($"안전지대 파티클 Shape 크기 조정: {radius}");
-        }
-    }
-}
-    void CheckPlayerSafetyAndDamage()
-    {
-        if (player == null) return;
-        
-        float distanceFromSafeZone = Vector3.Distance(player.position, safeZonePosition);
-        
-        if (distanceFromSafeZone <= safeZoneRadius)
-        {
-            Debug.Log($"플레이어가 안전장판 내부에 있음! (거리: {distanceFromSafeZone:F1}m <= {safeZoneRadius}m) - 데미지 없음");
-        }
-        else
-        {
-            IDamageable damageable = player.GetComponent<IDamageable>();
-            if (damageable != null)
-            {
-                damageable.TakeDamage(massiveDamage);
-                Debug.Log($"플레이어가 안전장판 밖에 있음! (거리: {distanceFromSafeZone:F1}m > {safeZoneRadius}m) - {massiveDamage} 데미지!");
-            }
-        }
-    }
-    
-    Vector3 GetRandomSafeZonePosition()
-    {
-        Vector3 randomPosition = Vector3.zero;
-        int attempts = 0;
-        int maxAttempts = 10;
-        
-        while (attempts < maxAttempts)
-        {
-            Vector3 randomDirection = Random.insideUnitSphere;
-            randomDirection.y = 0;
-            
-            float randomDistance = Random.Range(minSafeZoneDistance, maxSafeZoneDistance);
-            Vector3 candidatePosition = transform.position + (randomDirection.normalized * randomDistance);
-            
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(candidatePosition, out hit, 5f, NavMesh.AllAreas))
-            {
-                randomPosition = hit.position;
-                Debug.Log($"안전장판 위치 결정: {randomPosition} (하운드로부터 {randomDistance:F1}m)");
-                break;
-            }
-            
-            attempts++;
-        }
-        
-        if (attempts >= maxAttempts)
-        {
-            randomPosition = transform.position + Vector3.forward * 10f;
-            Debug.LogWarning("안전장판 위치를 찾지 못함 - 기본 위치 사용");
-        }
-        
-        return randomPosition;
     }
 
     void SafeStopAgent()
@@ -815,6 +627,14 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
     {
         if (isDead || player == null) return;
 
+        // 페이즈 전환 패턴이 실행 중일 때는 다른 모든 로직을 중단하고 제자리에 고정시킵니다.
+        if (isPhaseTransitionTriggered)
+        {
+            SafeStopAgent();
+            SetAnimationParameters(0f, 0f, 0f); // 이동 애니메이션 정지
+            return;
+        }
+
         // 점프 중이면 Behavior Tree 모드와 관계없이 처리해야 함
         if (isJumpingToTarget)
         {
@@ -835,18 +655,13 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             Debug.Log("C키 눌림 - 강제 돌진 공격 실행!");
             PerformChargeAttack();
         }
-        if (Input.GetKeyDown(KeyCode.T))
-        {
-            Debug.Log("T키 눌림 - 강제 쉴드 패턴 실행!");
-            PerformShieldPattern();
-        }
 
         if (Input.GetKeyDown(KeyCode.P)) // P키로 페이즈 2 강제 전환
     {
         if (!isPhase2 && !isPhaseTransitionTriggered)
         {
             Debug.Log("P키 - 강제 페이즈 2 전환!");
-            TriggerPhaseTransitionBarrier();
+            TriggerPhaseTransition();
         }
     }
 
@@ -865,25 +680,21 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             rightPawDamage *= phase2DamageMultiplier;
             lickBiteDamage *= phase2DamageMultiplier;
             jumpAttackDamage *= phase2DamageMultiplier;
-            projectileDamage *= phase2DamageMultiplier;
-            chargeDamage *= phase2DamageMultiplier;
-            massiveDamage *= phase2DamageMultiplier;
+            projectileDamage *= phase2DamageMultiplier; 
+            chargeDamage *= phase2DamageMultiplier; 
             
             Debug.Log($"=== 2페이즈 데미지 증가! ===");
             Debug.Log($"발차기: {leftPawDamage}, 물기: {lickBiteDamage}");
             Debug.Log($"점프: {jumpAttackDamage}, 투사체: {projectileDamage}");
-            Debug.Log($"돌진: {chargeDamage}, 쉴드패턴: {massiveDamage}");
+            Debug.Log($"돌진: {chargeDamage}");
         }
     }
     public void PerformProjectileAttack()
     {
-        if (projectileAttackTimer > 0)
-        {
-            // 투사체가 불가능할 경우 점프 공격
-            PerformJumpAttack();
-            Debug.Log($"투사체 쿨다운 중 (남은 시간: {projectileAttackTimer:F1}초) - 점프 공격으로 대체");
-            return;
-        }
+        if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
+
+        if (projectileAttackTimer > 0) return; // 쿨다운 체크
+
         if (isProjectileAttacking) return;
 
         // Behavior Tree 사용 시 공격 상태 설정
@@ -893,7 +704,7 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
 
         StartCoroutine(ProjectileAttackPattern());
-         projectileAttackTimer = projectileAttackCooldown;
+        projectileAttackTimer = projectileAttackCooldown; // 쿨다운 시작
         Debug.Log($"투사체 공격 실행 - 다음 투사체까지 {projectileAttackCooldown}초 대기");
     }
     IEnumerator ProjectileAttackPattern()
@@ -922,6 +733,62 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
         
         yield return new WaitForSeconds(1f); // 쿨다운
+    }
+
+    public void PerformSpiritArrowRain()
+    {
+        if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
+
+        // 쿨다운 중이거나 이미 시전 중이면 아무것도 하지 않고 반환합니다.
+        if (spiritArrowTimer > 0 || isFiringSpiritArrows) return;
+
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(true);
+        }
+
+        StartCoroutine(SpiritArrowRainPattern());
+    }
+
+    IEnumerator SpiritArrowRainPattern()
+    {
+        isFiringSpiritArrows = true;
+        spiritArrowTimer = spiritArrowCooldown; // 쿨다운 시작
+        SafeStopAgent();
+
+        Debug.Log("영혼 화살비(Spirit Arrow Rain) 시전!");
+
+        // 'FrontPawAttack' 애니메이션을 사용하여 빠르게 발사하는 느낌을 줍니다.
+        // 'Roar'는 2페이즈 전환 패턴에서 사용하므로, 다른 애니메이션으로 구분합니다.
+        animator.SetTrigger("FrontPawAttack");
+        yield return new WaitForSeconds(0.8f); // 기 모으는 시간
+
+        Vector3 directionToPlayer = (player.position - transform.position).normalized;
+        Quaternion centerRotation = Quaternion.LookRotation(directionToPlayer);
+        float angleStep = spiritArrowCount > 1 ? spiritArrowSpreadAngle / (spiritArrowCount - 1) : 0;
+        float startAngle = -spiritArrowSpreadAngle / 2f;
+
+        for (int i = 0; i < spiritArrowCount; i++)
+        {
+            float angle = startAngle + i * angleStep;
+            Quaternion rotation = centerRotation * Quaternion.Euler(0, angle, 0);
+            Vector3 fireDirection = rotation * Vector3.forward;
+
+            if (spiritArrowPrefab != null)
+            {
+                GameObject projectile = Instantiate(spiritArrowPrefab, mouthTransform.position, rotation);
+                var projectileScript = projectile.GetComponent<ParticleProjectile>() ?? projectile.AddComponent<ParticleProjectile>();
+                projectileScript.Initialize(fireDirection, spiritArrowSpeed, spiritArrowDamage * (isPhase2 ? phase2DamageMultiplier : 1f), 5f);
+            }
+            yield return new WaitForSeconds(0.1f); // 빠른 연사 간격
+        }
+
+        isFiringSpiritArrows = false;
+
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
     }
     void FireParticleProjectile()
     {
@@ -955,7 +822,7 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
     }
     void HandleNaturalCollisionAvoidance(float distance)
     {
-        if (isJumping || isBackingAway|| isAttacking || isShieldPatternActive)
+        if (isJumping || isBackingAway|| isAttacking)
         {
             isAvoiding = false;
             avoidanceDirection = Vector3.Lerp(avoidanceDirection, Vector3.zero, 
@@ -1060,51 +927,59 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         {
             projectileAttackTimer -= Time.deltaTime;
         }
+        if (spiritArrowTimer > 0)
+        {
+            spiritArrowTimer -= Time.deltaTime;
+        }
     }
 
     void HandleCombatState(float distance)
 {
-    if (isRecoveringFromJump || isJumping || isCharging || isProjectileAttacking)
+    if (isRecoveringFromJump || isJumping || isCharging || isProjectileAttacking || isFiringSpiritArrows || isPhaseTransitionTriggered || isAttacking)
     {
-        return;
+        return; // 기존 패턴 실행 중에는 다른 행동 방지
     }
         if (!isAttacking && attackTimer <= 0)
         {
             if (isPhase2)
             {
-
-
                 // 거리에 따른 패턴 선택
                 if (distance > attackRange * 1.5f)
                 {
-                    // 원거리에서는 돌진이나 투사체만
+                    // 2페이즈 원거리: 점프, 투사체, 영혼 화살비
                     float rangePatternRoll = Random.Range(0f, 1f);
-                    if (rangePatternRoll < 0.3f)          // 0~0.3 (30%)
+                    if (rangePatternRoll < 0.4f) // 40%
                     {
                         Debug.Log("2페이즈 원거리 - 점프 공격 선택");
                         PerformJumpAttack();
                     }
-                    else if (rangePatternRoll < 0.3f)     // 0.3~0.6 (30%)
-                    {
-                        Debug.Log("2페이즈 원거리 - 돌진 공격 선택");
-                        PerformChargeAttack();
-                    }
-                    else                                   // 0.6~1.0 (40%)
+                    else if (rangePatternRoll < 0.7f) // 30%
                     {
                         Debug.Log("2페이즈 원거리 - 투사체 공격 선택");
                         PerformProjectileAttack();
                     }
+                    else // 30%
+                    {
+                        Debug.Log("2페이즈 원거리 - 영혼 화살비 선택");
+                        PerformSpiritArrowRain();
+                    }
                 }
                 else if (distance <= attackRange)
                 {
-                    // 근거리에서는 기본 공격 위주
+                    // 2페이즈 근거리: 돌진 또는 기본 공격
                     float meleePatternRoll = Random.Range(0f, 1f);
                     
+                    if (meleePatternRoll < 0.15f) // 15% 확률로 돌진하여 거리 벌리기
+                    {
+                        Debug.Log("2페이즈 근거리 - 돌진 공격 선택");
+                        PerformChargeAttack();
+                    }
+                    else // 85% 확률로 일반 근접 공격
+                    {
+                        Debug.Log("2페이즈 근거리 - 기본 공격 선택");
                         PerformMeleeAttack();
-                    
-    
+                    }
                 }
-                return;
             }
             else
             {
@@ -1131,125 +1006,28 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
                     PerformMeleeAttack();
                 }
             }
-            return;
-}
-    // 회전 중에도 기본 이동은 유지
-    if (!IsLookingAtPlayer())
-    {
-        isRotatingToAttack = true;
-        RotateTowardsPlayer();
-        
-        // 회전 중에도 천천히 이동
-        if (!isAttacking && !isBackingAway)
-        {
-            SafeResumeAgent();
-            SafeSetDestination(player.position);
-            SafeSetSpeed(walkSpeed * 0.5f);
-            SetAnimationParameters(0f, 0.3f, 0.3f);
         }
-        return;
-    }
-
-    // 버퍼 값 최소화
-    float minBuffer = 0.1f;
-
-    // 근거리
-    if (distance <= closeRange + minBuffer)
-    {
-        if (!isAttacking && !isBackingAway)
-        {
-            bool canRetreat = Time.time - lastRetreatTime > 8f;
-            
-            if (Random.Range(0f, 1f) < 0.05f && !isAggressiveMode && canRetreat)
-            {
-                StartBackingAway();
-                lastRetreatTime = Time.time;
-            }
-            else if (attackTimer <= 0)
-            {
-                PerformMeleeAttack();
-            }
-            else
-            {
-                // 공격 대기 중에도 천천히 움직임
-                HandleIdleMovement(distance);
-            }
-        }
-    }
-    // 중거리
-    else if (distance <= attackRange + minBuffer)
-    {
-        if (attackTimer <= 0 && !isAttacking)
-        {
-            if (isAggressiveMode && consecutiveAttacks < maxConsecutiveAttacks)
-            {
-                PerformMeleeAttack();
-                consecutiveAttacks++;
-                attackTimer = attackCooldown * 0.5f;
-            }
-            else
-            {
-                float actionRoll = Random.Range(0f, 1f);
-                if (!isPhase2 || actionRoll < 0.8f)
-                {
-                    PerformMeleeAttack();
-                }
-                else
-                {
-                    PerformChargeAttack();
-                }
-            }
-        }
-        else
-        {
-            // 공격 대기 중에도 움직임 유지
-            HandleCautiousApproach();
-        }
-    }
-    // 원거리
-    else if (distance <= jumpAttackRange + minBuffer)
-    {
-        if (attackTimer <= 0 && !isAttacking)
-        {
-            float attackChoice = Random.Range(0f, 1f);
-            if (attackChoice < 0.5f)
-            {
-                PerformJumpAttack();
-            }
-            else
-            {
-                PerformMovingAttack();
-            }
-        }
-        else
-        {
-            // 공격 대기 중에도 접근
-            HandleNormalMovement(distance);
-        }
-    }
-    else
-    {
-        // 범위 밖에서는 계속 추적
-        HandleNormalMovement(distance);
-    }
-
-    isRotatingToAttack = false;
-    rotationTimer = 0f;
 }
 
 
     void HandleMovementWithBlendTree(float distance)
     {
-        // 쉴드 패턴 중이면 모든 이동 차단
-        if (isShieldPatternActive)
+        // 페이즈 전환 중에는 모든 이동 및 회전 차단
+        if (isPhaseTransitionTriggered)
         {
             SafeStopAgent();
             SetAnimationParameters(0f, 0f, 0f);
             return;
         }
 
-         // 투사체 공격 중이면 모든 이동 차단 추가
+        // 각종 패턴 실행 중 이동 차단
         if (isProjectileAttacking)
+        {
+            SafeStopAgent();
+            SetAnimationParameters(0f, 0f, 0f);
+            return;
+        }
+        if (isFiringSpiritArrows)
         {
             SafeStopAgent();
             SetAnimationParameters(0f, 0f, 0f);
@@ -1586,6 +1364,8 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
 
     public void PerformMeleeAttack()
     {
+        if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
+
         if (!IsLookingAtPlayer())
     {
         return;
@@ -1622,6 +1402,8 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
 
     public void PerformJumpAttack()
     {
+        if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
+
         if (!IsLookingAtPlayer())
         {
             return;
@@ -1655,8 +1437,69 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         Debug.Log($"NavMesh 점프 공격 실행! 목표: {jumpTargetPosition}");
     }
 
+    public void PerformRetreatAndRangedAttack()
+    {
+        if (isPhaseTransitionTriggered || isRetreatingForAttack) return;
+
+        // 기존 후퇴 쿨다운을 공유합니다.
+        if (Time.time - lastRetreatTime < retreatCooldown)
+        {
+            // 쿨다운 중이면 대신 일반 근접 공격을 합니다.
+            PerformMeleeAttack();
+            return;
+        }
+
+        StartCoroutine(RetreatAndRangedAttackPattern());
+    }
+
+    private IEnumerator RetreatAndRangedAttackPattern()
+    {
+        isRetreatingForAttack = true;
+        lastRetreatTime = Time.time;
+
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(true);
+        }
+
+        float retreatTimer = 0f;
+        float retreatDuration = 1.5f;
+        Debug.Log("후퇴 후 원거리 공격 시작!");
+
+        while (retreatTimer < retreatDuration)
+        {
+            HandleBackingAway(); // 기존 후퇴 로직 재사용
+            retreatTimer += Time.deltaTime;
+            yield return null;
+        }
+
+        isRetreatingForAttack = false;
+
+        // 후퇴 종료 후, 쿨다운을 무시하고 랜덤 원거리 공격을 즉시 실행합니다.
+        Debug.Log("후퇴 완료. 쿨다운 무시하고 원거리 공격 선택.");
+        float roll = Random.Range(0f, 1f);
+        if (roll < 0.4f)
+        {
+            // 점프 공격은 쿨다운이 있을 경우 다른 공격으로 대체
+            if (jumpAttackTimer <= 0) PerformJumpAttack();
+            else StartCoroutine(ProjectileAttackPattern()); // 대체 공격
+        }
+        else if (roll < 0.7f)
+        {
+            // 투사체 공격 (쿨다운 무시)
+            StartCoroutine(ProjectileAttackPattern());
+        }
+        else
+        {
+            // 영혼 화살비 (쿨다운 무시)
+            StartCoroutine(SpiritArrowRainPattern());
+        }
+    }
+
     void PerformMovingAttack()
     {
+        if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
+
         if (!IsLookingAtPlayer())
     {
         return;
@@ -1826,7 +1669,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     spawnPosition.y = 0.1f; // 지면에서 살짝 위로
     
     GameObject effect = Instantiate(jumpAreaEffectPrefab, spawnPosition, Quaternion.identity);
-    var damageComponent = effect.GetComponent<JumpAreaDamage>();
+    var damageComponent = effect.GetComponent<JumpAttackAreaDamage>();
     
     if (damageComponent != null)
     {
@@ -1835,7 +1678,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     }
     else
     {
-        Debug.LogError("JumpAreaDamage 컴포넌트를 찾을 수 없음!");
+        Debug.LogError("JumpAttackAreaDamage 컴포넌트를 찾을 수 없음! jumpAreaEffectPrefab에 해당 스크립트를 추가해주세요.");
     }
 }
     
@@ -1932,9 +1775,31 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         Debug.Log("착지 준비!");
     }
 
+    // 공격을 강제로 중단하는 메서드
+    public void CancelAttack()
+    {
+        if (!isAttacking) return;
+
+        isAttacking = false;
+        isJumping = false;
+        isCharging = false;
+        isProjectileAttacking = false;
+        isFiringSpiritArrows = false;
+        isRetreatingForAttack = false;
+
+        // Behavior Tree에 공격 종료 상태 전파
+        if (useBehaviorTree && houndBehaviorTree != null)
+        {
+            houndBehaviorTree.SetAttacking(false);
+        }
+        Debug.Log("공격이 강제로 중단되었습니다.");
+    }
+
+    public bool IsDead() => isDead;
+
     public void TakeDamage(float damageAmount)
     {
-        if (isDead) return;
+        if (isDead || isInvincible) return;
 
         if (Time.time - lastDamageTime < damageImmunityTime)
         {
@@ -1945,10 +1810,10 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         currentHp -= damageAmount;
         bossHealthBar?.UpdateHealth(currentHp);
         Debug.Log($"하운드가 {damageAmount} 데미지를 받았습니다. 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")})");
-        if (!isPhase2 && !hasTriggeredTransitionBarrier &&
+        if (!isPhase2 && !isPhaseTransitionTriggered &&
         currentHp <= maxHp * phase2HealthThreshold)
         {
-            TriggerPhaseTransitionBarrier();
+            TriggerPhaseTransition();
             return;
         }
 
@@ -1975,50 +1840,76 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         Destroy(gameObject, 3f);
         playerData.AddGold(dropGold);
     }
-    void TriggerPhaseTransitionBarrier()
-{
-    if (hasTriggeredTransitionBarrier) return;
-    
-    hasTriggeredTransitionBarrier = true;
-    isPhaseTransitionTriggered = true;
-    
-    Debug.Log("=== 페이즈 전환 배리어 패턴 시작! ===");
-    
-    // 강제로 배리어 패턴 실행
-    ForcePerformShieldPattern();
-}
-
-    void ForcePerformShieldPattern() //  강제 배리어 패턴 실행
+    void TriggerPhaseTransition()
     {
+        if (isPhaseTransitionTriggered) return;
         
-        if (isShieldPatternActive)
-    {
-        Debug.Log("이미 배리어 패턴이 활성화되어 있음");
-        return;
-    }
-        Debug.Log("배리어 패턴 시작 시도!");
-        // 애니메이션 트리거 확인
-    if (animator != null)
-    {
-        animator.SetTrigger("Shield");
-        Debug.Log("Shield 애니메이션 트리거 실행");
-    }   
+        isPhaseTransitionTriggered = true;
+        
+        Debug.Log("=== 페이즈 전환 패턴 시작! ===");
+        
         // 모든 다른 행동 정지
         isAttacking = false;
         isJumping = false;
+        isJumpingToTarget = false; // 점프 상태 플래그 추가 초기화
         isBackingAway = false;
-        
-        // Behavior Tree 사용 시 공격 상태 해제
-        if (useBehaviorTree && houndBehaviorTree != null)
+        isCharging = false;
+        isProjectileAttacking = false;
+        isFiringSpiritArrows = false;
+        SafeStopAgent();
+        if (agent.hasPath) agent.ResetPath(); // 이동 경로를 완전히 초기화하여 따라가는 현상을 방지합니다.
+
+        // 새로운 2페이즈 전환 패턴 코루틴을 시작합니다.
+        StartCoroutine(Phase2TransitionPattern());
+    }
+
+    IEnumerator Phase2TransitionPattern()
+    {
+        // 1. 무적 상태 및 쉴드 활성화
+        // TriggerPhaseTransition에서 이미 NavMeshAgent를 정지하고 경로를 초기화했습니다.
+        // 여기서는 루트 모션만 추가로 제어하여 애니메이션으로 인한 움직임을 방지합니다.
+        bool originalRootMotion = animator.applyRootMotion;
+        animator.applyRootMotion = false; // 애니메이션의 루트 모션으로 인한 움직임을 방지합니다.
+        animator.SetTrigger("Roar"); // 포효 애니메이션으로 전환 시작을 알림
+        isInvincible = true;
+        if (houndShieldPrefab != null)
         {
-            houndBehaviorTree.SetAttacking(false);
+            // 쉴드를 하운드의 자식으로 생성하고, 제공해주신 정확한 로컬 좌표로 위치를 설정합니다.
+            houndShield = Instantiate(houndShieldPrefab, transform);
+            houndShield.transform.localPosition = new Vector3(0f, 0.5887311f, -3.59f);
+            houndShield.transform.localRotation = Quaternion.identity; // 회전값도 초기화합니다.
+            Debug.Log("페이즈 전환: 쉴드 생성 및 무적 상태 돌입");
         }
-        
-        soundManager?.PlayShieldPatternSound();
-        // 배리어 패턴 실행
-        PerformShieldPattern();
-        
-        Debug.Log("페이즈 전환을 위한 배리어 패턴 강제 실행");
+
+        // 2. 바닥 물기 패턴 3회 실행
+        for (int i = 0; i < floorBiteCount; i++)
+        {
+            Debug.Log($"바닥 물기 패턴 {i + 1}/{floorBiteCount}");
+
+            // 플레이어의 현재 위치에 즉시 공격 실행
+            Vector3 targetPosition = player.position; // 매번 플레이어의 현재 위치를 다시 가져옴
+
+            if (floorBitePrefab != null)
+            {
+                GameObject biteEffect = Instantiate(floorBitePrefab, targetPosition, Quaternion.identity);
+                var damageComponent = biteEffect.GetComponent<JumpAreaDamage>();
+                if (damageComponent != null)
+                {
+                    // 데미지를 지연시키는 새로운 메서드 호출
+                    damageComponent.InitializeWithDelay(floorBiteDamage, jumpAreaRadius * 0.7f, floorBiteDamageDelay);
+                }
+            }
+            yield return new WaitForSeconds(floorBiteInterval);
+        }
+
+        // 3. 쉴드 제거 및 무적 해제, 2페이즈 활성화
+        if (houndShield != null) Destroy(houndShield);
+        isInvincible = false;
+        Debug.Log("페이즈 전환: 쉴드 제거 및 무적 해제");
+
+        // NavMeshAgent의 제어는 Behavior Tree가 다시 시작하므로, 여기서는 별도로 활성화할 필요가 없습니다.
+        animator.applyRootMotion = originalRootMotion; // 원래 루트 모션 상태로 복원합니다.
+        StartPhase2WithAura(); // 오라와 함께 2페이즈 시작
     }
 
     void OnDrawGizmosSelected()

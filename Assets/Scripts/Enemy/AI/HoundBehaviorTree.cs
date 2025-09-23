@@ -24,10 +24,11 @@ namespace EnemyAI
         public float AttackCooldown = 1.5f;
         public float JumpAttackCooldown = 4f;
         public float ChargeAttackCooldown = 5f;
-        public float ProjectileAttackCooldown = 4f;
+        public float ProjectileAttackCooldown = 6f;
+        public float SpiritArrowCooldown = 12f;
+        public float RetreatAttackCooldown = 8f;
 
         [Header("Phase Settings")]
-        public bool IsPhase2 = false;
         public float Phase2HealthThreshold = 0.5f;
         public float Phase2SpeedMultiplier = 1.3f;
         public float Phase2AttackSpeedMultiplier = 0.8f;
@@ -37,13 +38,14 @@ namespace EnemyAI
         private EnemyBlackboard bb;
         private BTNode root;
         private HoundAI houndAI;
-        private EnemyHealth health;
 
         // Timers
         private float attackTimer = 0f;
         private float jumpAttackTimer = 0f;
         private float chargeAttackTimer = 0f;
         private float projectileAttackTimer = 0f;
+        private float spiritArrowTimer = 0f;
+        private float retreatAttackTimer = 0f;
 
         // Animation
         private float speedSmoothVel = 0f;
@@ -53,7 +55,6 @@ namespace EnemyAI
             agent = GetComponent<NavMeshAgent>();
             anim = GetComponent<Animator>();
             houndAI = GetComponent<HoundAI>();
-            health = GetComponent<EnemyHealth>();
 
             bb = new EnemyBlackboard
             {
@@ -75,38 +76,27 @@ namespace EnemyAI
 
         private void BuildTree()
         {
-            // Leaf node creation functions
-            BTNode Combat() => new CombatNode(bb, this);
-            BTNode Phase2Combat() => new Phase2CombatNode(bb, this);
-            BTNode Chase() => new ChaseNode(bb, this);
-            BTNode Retreat() => new RetreatNode(bb, this);
-            BTNode Patrol() => new PatrolNode(bb, this);
-
             // Main behavior tree structure
             root = new Selector(bb,
-                // Phase-specific combat
-                new Sequence(bb, 
-                    new ConditionNode(bb, () => bb.CanSeePlayer && bb.InAttackRange),
-                    IsPhase2 ? Phase2Combat() : Combat()
-                ),
-                // Chase if see player
-                new Sequence(bb, 
-                    new ConditionNode(bb, () => bb.CanSeePlayer && !bb.InAttackRange), 
-                    Chase()
+                // 플레이어를 보면 교전 시작
+                new Sequence(bb,
+                    new ConditionNode(bb, () => bb.CanSeePlayer),
+                    new EngageNode(bb, this) // 모든 전투/추격 로직을 담당
                 ),
                 // Alert state (just saw player recently)
-                new Sequence(bb, 
-                    new ConditionNode(bb, () => bb.AlertTimer > 0f), 
-                    Retreat()
+                new Sequence(bb,
+                    new ConditionNode(bb, () => bb.AlertTimer > 0f),
+                    new RetreatNode(bb, this)
                 ),
                 // Default patrol/idle
-                Patrol()
+                new PatrolNode(bb, this)
             );
         }
 
         private void Update()
         {
-            if (health != null && health.IsDead)
+            // 하운드가 죽었거나, 페이즈 전환 패턴 중에는 모든 행동을 중지합니다.
+            if (houndAI != null && (houndAI.IsDead() || houndAI.isPhaseTransitionTriggered))
             {
                 agent.isStopped = true;
                 anim.SetFloat("Speed", 0f);
@@ -125,6 +115,8 @@ namespace EnemyAI
             if (jumpAttackTimer > 0) jumpAttackTimer -= Time.deltaTime;
             if (chargeAttackTimer > 0) chargeAttackTimer -= Time.deltaTime;
             if (projectileAttackTimer > 0) projectileAttackTimer -= Time.deltaTime;
+            if (spiritArrowTimer > 0) spiritArrowTimer -= Time.deltaTime;
+            if (retreatAttackTimer > 0) retreatAttackTimer -= Time.deltaTime;
             if (bb.AlertTimer > 0) bb.AlertTimer -= Time.deltaTime;
         }
 
@@ -236,19 +228,23 @@ namespace EnemyAI
                 case "jump": return jumpAttackTimer <= 0;
                 case "charge": return chargeAttackTimer <= 0;
                 case "projectile": return projectileAttackTimer <= 0;
+                case "spiritarrow": return spiritArrowTimer <= 0;
+                case "retreat": return retreatAttackTimer <= 0;
                 default: return true;
             }
         }
 
         public void StartAttackCooldown(string attackType)
         {
-            attackTimer = AttackCooldown;
+            attackTimer = AttackCooldown * (houndAI.isPhase2 ? Phase2AttackSpeedMultiplier : 1f);
             
             switch (attackType.ToLower())
             {
                 case "jump": jumpAttackTimer = JumpAttackCooldown; break;
                 case "charge": chargeAttackTimer = ChargeAttackCooldown; break;
                 case "projectile": projectileAttackTimer = ProjectileAttackCooldown; break;
+                case "spiritarrow": spiritArrowTimer = SpiritArrowCooldown; break;
+                case "retreat": retreatAttackTimer = RetreatAttackCooldown; break;
             }
         }
 
@@ -261,158 +257,133 @@ namespace EnemyAI
             public override NodeState Evaluate() => predicate() ? NodeState.Success : NodeState.Failure;
         }
 
-        private class CombatNode : BTNode
+        private class EngageNode : BTNode
         {
             private HoundBehaviorTree ctx;
-            public CombatNode(EnemyBlackboard bb, HoundBehaviorTree c) : base(bb) { ctx = c; }
+            public EngageNode(EnemyBlackboard bb, HoundBehaviorTree c) : base(bb) { ctx = c; }
 
             public override NodeState Evaluate()
             {
-                if (!bb.CanSeePlayer || !bb.InAttackRange) return NodeState.Failure;
-
-                // 방향 계산 및 각도 체크
-                Vector3 toPlayer = bb.Player.position - ctx.transform.position;
-                toPlayer.y = 0f;
-                float sqrMag = toPlayer.sqrMagnitude;
-                if (sqrMag <= 0.01f) return NodeState.Running;
-
-                Vector3 dirNorm = toPlayer.normalized;
-                float angle = Vector3.Angle(ctx.transform.forward, dirNorm);
-                bool facingEnough = angle <= 30f; // HoundAI의 IsLookingAtPlayer 기준과 동일하게 맞춤
-
-                // 각도 미정렬이면 이동을 유지해 측면 멈춤 방지
-                if (!facingEnough)
-                {
-                    ctx.agent.isStopped = false;
-                    ctx.agent.speed = ctx.WalkSpeed;
-
-                    // 측면 스트레이프 목적지 계산 (좌/우로 번갈아 움직임)
-                    Vector3 right = Vector3.Cross(Vector3.up, dirNorm).normalized;
-                    float side = (Time.frameCount % 120 < 60) ? 1f : -1f; // 1초 간격으로 좌/우 전환
-                    Vector3 sideTarget = bb.Player.position - dirNorm * Mathf.Min(ctx.AttackRange * 0.8f, 2.0f) + right * side * 1.5f;
-                    ctx.agent.SetDestination(sideTarget);
-
-                    // 회전 보조
-                    Quaternion look = Quaternion.LookRotation(dirNorm);
-                    ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, look, Time.deltaTime * 10f);
-                    return NodeState.Running;
-                }
-
-                // 각도 정렬되면 정지 후 공격 판단
-                ctx.agent.isStopped = true;
-                if (ctx.agent.hasPath) ctx.agent.ResetPath();
-                ctx.agent.velocity = Vector3.zero;
-                // 정지 상태에서도 계속 회전해 각도를 더 맞춰줌
-                {
-                    Quaternion lookPrecise = Quaternion.LookRotation(dirNorm);
-                    ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, lookPrecise, Time.deltaTime * 10f);
-                }
-
-                // Perform attack if ready and not already attacking
-                if (!bb.IsAttacking && ctx.attackTimer <= 0)
-                {
-                    ctx.PerformMeleeAttack();
-                }
-
-                return NodeState.Running;
-            }
-        }
-
-        private class Phase2CombatNode : BTNode
-        {
-            private HoundBehaviorTree ctx;
-            public Phase2CombatNode(EnemyBlackboard bb, HoundBehaviorTree c) : base(bb) { ctx = c; }
-
-            public override NodeState Evaluate()
-            {
-                if (!bb.CanSeePlayer || !bb.InAttackRange) return NodeState.Failure;
-
-                // 방향 계산 및 각도 체크
-                Vector3 toPlayer = bb.Player.position - ctx.transform.position;
-                toPlayer.y = 0f;
-                float sqrMag = toPlayer.sqrMagnitude;
-                if (sqrMag <= 0.01f) return NodeState.Running;
-
-                Vector3 dirNorm = toPlayer.normalized;
-                float angle = Vector3.Angle(ctx.transform.forward, dirNorm);
-                bool facingEnough = angle <= 30f; // HoundAI의 IsLookingAtPlayer 기준과 동일하게 맞춤
-
-                // 각도 미정렬이면 이동 유지
-                if (!facingEnough)
-                {
-                    ctx.agent.isStopped = false;
-                    ctx.agent.speed = ctx.WalkSpeed;
-
-                    // 측면 스트레이프 목적지 계산 (좌/우로 번갈아 움직임)
-                    Vector3 right = Vector3.Cross(Vector3.up, dirNorm).normalized;
-                    float side = (Time.frameCount % 120 < 60) ? 1f : -1f;
-                    Vector3 sideTarget = bb.Player.position - dirNorm * Mathf.Min(ctx.AttackRange * 0.8f, 2.0f) + right * side * 1.5f;
-                    ctx.agent.SetDestination(sideTarget);
-
-                    Quaternion look = Quaternion.LookRotation(dirNorm);
-                    ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, look, Time.deltaTime * 10f);
-                    return NodeState.Running;
-                }
-
-                // 각도 정렬되면 정지 후 공격 판단
-                ctx.agent.isStopped = true;
-                if (ctx.agent.hasPath) ctx.agent.ResetPath();
-                ctx.agent.velocity = Vector3.zero;
-                // 정지 상태에서도 계속 회전해 각도를 더 맞춰줌
-                {
-                    Quaternion lookPrecise = Quaternion.LookRotation(dirNorm);
-                    ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, lookPrecise, Time.deltaTime * 10f);
-                }
-
-                // Phase 2 attack selection - only if not attacking
-                if (!bb.IsAttacking && ctx.attackTimer <= 0)
-                {
-                    float attackChoice = Random.Range(0f, 1f);
-                    if (attackChoice < 0.4f) // 40% melee
-                    {
-                        ctx.PerformMeleeAttack();
-                    }
-                    else if (attackChoice < 0.7f) // 30% projectile
-                    {
-                        ctx.PerformProjectileAttack();
-                    }
-                    else // 30% charge
-                    {
-                        ctx.PerformChargeAttack();
-                    }
-                }
-
-                return NodeState.Running;
-            }
-        }
-
-        private class ChaseNode : BTNode
-        {
-            private HoundBehaviorTree ctx;
-            public ChaseNode(EnemyBlackboard bb, HoundBehaviorTree c) : base(bb) { ctx = c; }
-
-            public override NodeState Evaluate()
-            {
-                if (!bb.CanSeePlayer) return NodeState.Failure;
-                if (bb.IsAttacking) return NodeState.Running; // 공격 중이면 추격 로직 중단 (제자리 유지)
-
-                ctx.agent.isStopped = false;
                 float distance = Vector3.Distance(ctx.transform.position, bb.Player.position);
-                
-                // Set appropriate speed
-                bool shouldRun = distance > ctx.RunThreshold;
-                ctx.agent.speed = shouldRun ? ctx.RunSpeed : ctx.WalkSpeed;
-                ctx.agent.SetDestination(bb.Player.position);
 
-                // Consider jump attack at medium range
-                if (distance > ctx.AttackRange && distance <= ctx.JumpAttackRange && ctx.jumpAttackTimer <= 0)
+                // 공격 중이라도 플레이어가 너무 멀어지면 공격을 취소하고 추격 상태로 전환합니다.
+                if (bb.IsAttacking)
                 {
-                    if (Random.Range(0f, 1f) < 0.3f) // 30% chance
+                    if (distance > ctx.AttackRange * 1.2f) // 공격 범위의 120% 이상 멀어지면
                     {
-                        ctx.PerformJumpAttack();
+                        ctx.houndAI.CancelAttack(); // 공격 강제 중단
                     }
+                    return NodeState.Running; // 공격 중(또는 방금 취소됨)이므로 다른 행동은 하지 않음
                 }
 
+                if (ctx.houndAI.isPhase2)
+                {
+                    // === PHASE 2 LOGIC ===
+                    // 1. 원거리 공격이 가능한지 먼저 확인합니다.
+                    if (distance > ctx.AttackRange * 1.5f && ctx.attackTimer <= 0)
+                    {
+                        // Ranged Combat - 멈춰서 원거리 공격
+                        ctx.agent.isStopped = true;
+                        if (ctx.agent.hasPath) ctx.agent.ResetPath();
+
+                        Vector3 toPlayer = bb.Player.position - ctx.transform.position;
+                        float angle = Vector3.Angle(ctx.transform.forward, toPlayer.normalized);
+                        if (angle <= 30f)
+                        {
+                            float roll = Random.Range(0f, 1f);
+                            if (roll < 0.4f && ctx.CanPerformAttack("jump")) { ctx.PerformJumpAttack(); }
+                            else if (roll < 0.7f && ctx.CanPerformAttack("projectile")) { ctx.PerformProjectileAttack(); }
+                            else if (ctx.CanPerformAttack("spiritarrow")) { ctx.PerformSpiritArrowRain(); }
+                        }
+                        else // 아직 플레이어를 보지 못했다면 회전만 합니다.
+                        {
+                            toPlayer.y = 0f;
+                            Quaternion look = Quaternion.LookRotation(toPlayer.normalized);
+                            ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, look, Time.deltaTime * 10f);
+                        }
+                    }
+                    // 2. 원거리 공격 조건이 아니면서, 근접 공격 범위 밖에 있다면 추격합니다.
+                    else if (distance > ctx.AttackRange)
+                    {
+                        // Chase Logic
+                        ctx.agent.isStopped = false;
+                        ctx.agent.speed = ctx.RunSpeed * ctx.Phase2SpeedMultiplier;
+                        ctx.agent.SetDestination(bb.Player.position);
+                    }
+                    else
+                    {
+                        // 3. 근접 공격 범위 안일 때만 근접 공격을 시도합니다.
+                        ctx.agent.isStopped = true;
+                        if (ctx.agent.hasPath) ctx.agent.ResetPath();
+
+                        Vector3 toPlayer = bb.Player.position - ctx.transform.position;
+                        toPlayer.y = 0f;
+                        Quaternion look = Quaternion.LookRotation(toPlayer.normalized);
+                        ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, look, Time.deltaTime * 10f);
+
+                        if (ctx.attackTimer <= 0)
+                        {
+                            // 공격을 실행하기 직전에, 플레이어가 여전히 공격 범위 내에 있는지 다시 한번 확인합니다.
+                            // 이렇게 하면 공격 애니메이션이 시작되기 전에 플레이어가 범위를 벗어나는 경우,
+                            // 헛된 공격을 하지 않고 즉시 추격을 시작할 수 있습니다.
+                            if (Vector3.Distance(ctx.transform.position, bb.Player.position) <= ctx.AttackRange)
+                            {
+                                float angle = Vector3.Angle(ctx.transform.forward, toPlayer.normalized);
+                                if (angle <= 30f)
+                                {
+                                    // 20% 확률로 후퇴 공격, 15% 확률로 돌진, 나머지 65%는 일반 근접 공격
+                                    float roll = Random.Range(0f, 1f);
+                                    if (roll < 0.2f && ctx.CanPerformAttack("retreat"))
+                                    {
+                                        ctx.PerformRetreatAttack();
+                                    }
+                                    else if (roll < 0.35f && ctx.CanPerformAttack("charge"))
+                                    {
+                                        ctx.PerformChargeAttack();
+                                    }
+                                    else { ctx.PerformMeleeAttack(); }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // === PHASE 1 LOGIC ===
+                    if (distance > ctx.AttackRange)
+                    {
+                        // Chase
+                        ctx.agent.isStopped = false;
+                        ctx.agent.speed = distance > ctx.RunThreshold ? ctx.RunSpeed : ctx.WalkSpeed;
+                        ctx.agent.SetDestination(bb.Player.position);
+
+                        if (distance <= ctx.JumpAttackRange && ctx.CanPerformAttack("jump"))
+                        {
+                            // HoundAI의 1페이즈 원거리 로직은 이동공격/점프공격이지만, BT에서는 점프만 구현
+                            if (Random.Range(0f, 1f) < 0.3f) { ctx.PerformJumpAttack(); }
+                        }
+                    }
+                    else
+                    {
+                        // Close Combat
+                        ctx.agent.isStopped = true;
+                        if (ctx.agent.hasPath) ctx.agent.ResetPath();
+
+                        Vector3 toPlayer = bb.Player.position - ctx.transform.position;
+                        toPlayer.y = 0f;
+                        Quaternion look = Quaternion.LookRotation(toPlayer.normalized);
+                        ctx.transform.rotation = Quaternion.Slerp(ctx.transform.rotation, look, Time.deltaTime * 10f);
+
+                        if (ctx.attackTimer <= 0)
+                        {
+                            float angle = Vector3.Angle(ctx.transform.forward, toPlayer.normalized);
+                            if (angle <= 30f)
+                            {
+                                ctx.PerformMeleeAttack();
+                            }
+                        }
+                    }
+                }
                 return NodeState.Running;
             }
         }
@@ -500,6 +471,24 @@ namespace EnemyAI
             {
                 houndAI.PerformProjectileAttack();
                 StartAttackCooldown("projectile");
+            }
+        }
+
+        private void PerformSpiritArrowRain()
+        {
+            if (houndAI != null && CanPerformAttack("spiritarrow"))
+            {
+                houndAI.PerformSpiritArrowRain();
+                StartAttackCooldown("spiritarrow");
+            }
+        }
+
+        private void PerformRetreatAttack()
+        {
+            if (houndAI != null && CanPerformAttack("retreat"))
+            {
+                houndAI.PerformRetreatAndRangedAttack();
+                StartAttackCooldown("retreat");
             }
         }
 
