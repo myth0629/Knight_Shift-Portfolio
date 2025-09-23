@@ -1839,6 +1839,15 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
 
         Destroy(gameObject, 3f);
         playerData.AddGold(dropGold);
+
+        // 스테이지 매니저에 보스 처치 알림
+        var hook = GetComponent<StageBossHook>();
+        if (hook == null)
+        {
+            hook = gameObject.AddComponent<StageBossHook>();
+            hook.stageManager = StageManager.Instance;
+        }
+        hook?.OnBossDied();
     }
     void TriggerPhaseTransition()
     {

@@ -10,6 +10,7 @@ public class StatusUI : MonoBehaviour
     public TextMeshProUGUI spText;
     public TextMeshProUGUI weaponNameText;
     public TextMeshProUGUI weaponAttackText;
+    public TextMeshProUGUI weaponTierText; // 무기 티어 텍스트 추가
     
     [Header("패널")]
     public GameObject statusPanel;
@@ -148,6 +149,12 @@ public class StatusUI : MonoBehaviour
                     weaponNameText.text = $"{weaponDisplayName} + {upgradeLevel}";
                 }
                 
+                // 무기 티어 표시
+                if (weaponTierText != null)
+                {
+                    weaponTierText.text = $"Tier {weaponData.tier}";
+                }
+                
                 // 무기 공격력 계산 및 표시
                 if (weaponAttackText != null)
                 {
@@ -158,7 +165,7 @@ public class StatusUI : MonoBehaviour
                     weaponAttackText.text = $"ATK : {Mathf.RoundToInt(enhancedAttack)}";
                 }
                 
-                Debug.Log($"무기 정보 업데이트: {weaponData.weaponName} +{upgradeLevel}, ATK: {weaponData.damage * (1 + (upgradeLevel * 0.1f))}");
+                Debug.Log($"무기 정보 업데이트: {weaponData.weaponName} +{upgradeLevel}, Tier {weaponData.tier}, ATK: {weaponData.damage * (1 + (upgradeLevel * 0.1f))}");
             }
             else
             {
@@ -179,6 +186,10 @@ public class StatusUI : MonoBehaviour
         if (weaponNameText != null)
         {
             weaponNameText.text = "Weapon + 0";
+        }
+        if (weaponTierText != null)
+        {
+            weaponTierText.text = "Tier 0";
         }
         if (weaponAttackText != null)
         {

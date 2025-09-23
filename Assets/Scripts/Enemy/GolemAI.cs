@@ -150,7 +150,7 @@
         DisableAttackCollider();
 
         if (bossHealthBar == null)
-            bossHealthBar = FindObjectOfType<SimpleBossHealthBar>();
+            bossHealthBar = FindFirstObjectByType<SimpleBossHealthBar>();
         if (bossHealthBar != null)
         {
             bossHealthBar.ShowBossHealthBar(bossName, maxHp, currentHp);
@@ -793,6 +793,16 @@
         Destroy(gameObject, 5f);
         Debug.Log("골렘 사망!");
         playerData.AddGold(dropGold);
+
+        // 스테이지 매니저에 보스 처치 알림
+        var hook = GetComponent<StageBossHook>();
+        if (hook == null)
+        {
+            // 런타임에 보스 프리팹에 훅이 없을 수 있어 안전하게 추가
+            hook = gameObject.AddComponent<StageBossHook>();
+            hook.stageManager = StageManager.Instance;
+        }
+        hook?.OnBossDied();
     }
 
         void OnDrawGizmosSelected()

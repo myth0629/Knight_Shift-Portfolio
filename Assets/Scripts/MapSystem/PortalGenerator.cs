@@ -9,7 +9,19 @@ public class PortalGenerator : MonoBehaviour
     [SerializeField] private GameObject battlePortalPrefab;
     [SerializeField] private GameObject shopPortalPrefab;
     [SerializeField] private GameObject campPortalPrefab;
-    [SerializeField] private GameObject bossPortalPrefab;
+    [SerializeField] private GameObject bossPortalPrefab; // 기본(예비) 보스 포탈 프리팹
+
+    [Header("Boss Portal (50/50 Random)")]
+    [Tooltip("보스 포탈 A 프리팹 (예: Boss Portal 1)")]
+    [SerializeField] private GameObject bossPortalStage1Prefab;
+    [Tooltip("보스 포탈 B 프리팹 (예: Boss Portal 2)")]
+    [SerializeField] private GameObject bossPortalStage2Prefab;
+
+    [Header("Boss Scenes (50/50 Random)")]
+    [Tooltip("보스 씬 A (예: Golem)")]
+    [SerializeField] private string bossStage1SceneName;
+    [Tooltip("보스 씬 B (예: Hound)")]
+    [SerializeField] private string bossStage2SceneName;
 
     [Header("Portal Placement")]
     [SerializeField] private Transform portalParent;
@@ -117,7 +129,7 @@ public class PortalGenerator : MonoBehaviour
     {
         Debug.Log($"Creating portal for node: {node.id} at position: {position}");
         // 노드 타입별 포털 프리팹 선택
-        GameObject prefab = GetPrefabForNodeType(node.nodeType);
+    GameObject prefab = GetPrefabForNodeType(node.nodeType);
         if (prefab == null) return;
         
         // 포털 인스턴스 생성: prefab을 portalParent의 로컬 공간에서 Vector3.zero에 인스턴스화 한 뒤, localPosition을 position으로 설정
@@ -133,6 +145,21 @@ public class PortalGenerator : MonoBehaviour
         {
             portalComponent.SetNodeId(node.id);
             Debug.Log($"Set nodeId {node.id} to Portal component");
+
+            // 보스 노드라면 50/50로 보스 씬을 랜덤 지정
+            if (node.nodeType == NodeType.Boss)
+            {
+                string bossScene = GetRandomBossSceneName();
+                if (!string.IsNullOrEmpty(bossScene))
+                {
+                    portalComponent.SetSceneName(bossScene);
+                    Debug.Log($"Boss portal set to scene '{bossScene}' (random)");
+                }
+                else
+                {
+                    Debug.LogWarning("Boss scene name is empty for current stage. Please assign in PortalGenerator inspector.");
+                }
+            }
         }
         else
         {
@@ -166,11 +193,35 @@ public class PortalGenerator : MonoBehaviour
             case NodeType.Battle: return battlePortalPrefab;
             case NodeType.Shop: return shopPortalPrefab;
             case NodeType.Camp: return campPortalPrefab;
-            case NodeType.Boss: return bossPortalPrefab;
+            case NodeType.Boss: return GetRandomBossPortalPrefab();
             default: 
                 Debug.LogWarning($"No portal prefab defined for node type: {type}");
                 return null; // 기본 예비 프리팹은 사용하지 않음
         }
+    }
+
+    private GameObject GetRandomBossPortalPrefab()
+    {
+        // 50/50 랜덤으로 Boss Portal A/B 선택, 미설정 시 기본 프리팹 사용
+        bool pickA = Random.value < 0.5f;
+        GameObject picked = pickA ? bossPortalStage1Prefab : bossPortalStage2Prefab;
+        if (picked != null) return picked;
+        // 하나가 비어있다면 다른 하나라도 사용
+        if (bossPortalStage1Prefab != null) return bossPortalStage1Prefab;
+        if (bossPortalStage2Prefab != null) return bossPortalStage2Prefab;
+        return bossPortalPrefab;
+    }
+
+    private string GetRandomBossSceneName()
+    {
+        // 50/50 랜덤으로 보스 씬 A/B 선택
+        bool pickA = Random.value < 0.5f;
+        string picked = pickA ? bossStage1SceneName : bossStage2SceneName;
+        if (!string.IsNullOrEmpty(picked)) return picked;
+        // 하나가 비어있으면 다른 하나 사용
+        if (!string.IsNullOrEmpty(bossStage1SceneName)) return bossStage1SceneName;
+        if (!string.IsNullOrEmpty(bossStage2SceneName)) return bossStage2SceneName;
+        return string.Empty;
     }
     
     /// <summary>
