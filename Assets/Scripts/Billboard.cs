@@ -3,6 +3,7 @@ using UnityEngine;
 public class Billboard : MonoBehaviour
 {
     private Transform mainCameraTransform;
+    private Camera mainCamera;
 
     void Start()
     {
@@ -10,6 +11,11 @@ public class Billboard : MonoBehaviour
         if (Camera.main != null)
         {
             mainCameraTransform = Camera.main.transform;
+        }
+        else
+        {
+            mainCamera = FindFirstObjectByType<Camera>();
+            mainCameraTransform = mainCamera.transform;
         }
     }
 
