@@ -31,10 +31,10 @@ public class HoundAI : MonoBehaviour, IDamageable
     [SerializeField] float closeRange = 1.8f;
     [SerializeField] float jumpAttackRange = 4.5f;
     [SerializeField] float optimalAttackDistance = 2.8f;
-    [SerializeField] float leftPawDamage = 10f;
-    [SerializeField] float rightPawDamage = 15f;
-    [SerializeField] float lickBiteDamage = 20f;
-    [SerializeField] float jumpAttackDamage = 40f;
+    [SerializeField] float leftPawDamage = 5f;
+    [SerializeField] float rightPawDamage = 7f;
+    [SerializeField] float lickBiteDamage = 10f;
+    [SerializeField] float jumpAttackDamage = 20f;
     [SerializeField] float attackCooldown = 1.5f;
     [SerializeField] float jumpAttackRecoveryTime = 2f;
     [SerializeField] float rangeBuffer = 0.3f; // 공격 범위 버퍼
@@ -57,7 +57,7 @@ public class HoundAI : MonoBehaviour, IDamageable
     [SerializeField] private int spiritArrowCount = 5; // 발사할 투사체 개수
     [SerializeField] private float spiritArrowSpreadAngle = 45f; // 부채꼴 각도
     [SerializeField] private float spiritArrowSpeed = 10f;
-    [SerializeField] private float spiritArrowDamage = 8f;
+    [SerializeField] private float spiritArrowDamage = 4f;
     [SerializeField] private float spiritArrowCooldown = 12f;
     private bool isFiringSpiritArrows = false;
     private float spiritArrowTimer = 0f;
@@ -84,13 +84,13 @@ public class HoundAI : MonoBehaviour, IDamageable
     [SerializeField] int projectileCount = 3;
     [SerializeField] float projectileSpeed = 12f;
     [SerializeField] float projectileInterval = 0.4f;
-    [SerializeField] float projectileDamage = 10f; // 기존 frontPawDamage와 동일
+    [SerializeField] float projectileDamage = 5f; // 기존 frontPawDamage와 동일
 
     bool isProjectileAttacking = false;
 
     [Header("돌진 공격 설정")]
     [SerializeField] float chargeSpeed = 12f;        // 속도 조정
-    [SerializeField] float chargeDamage = 15f;       // 데미지 증가
+    [SerializeField] float chargeDamage = 13f;       // 데미지 증가
     [SerializeField] float chargeDistance = 6f;      // 거리 조정
     [SerializeField] float chargeHitRadius = 2.5f;   // 히트 범위 증가
     [SerializeField] float chargePreparationTime = 0.5f; // 준비 시간
@@ -206,7 +206,7 @@ public class HoundAI : MonoBehaviour, IDamageable
     [SerializeField] private GameObject houndShieldPrefab; // 2페이즈 전환 시 사용할 쉴드 프리팹
     private GameObject houndShield; // 쉴드 인스턴스
     [SerializeField] private GameObject floorBitePrefab; // 바닥에서 솟아나는 물기 이펙트 프리팹
-    [SerializeField] private float floorBiteDamage = 25f;
+    [SerializeField] private float floorBiteDamage = 13f;
     [SerializeField] private float floorBiteDamageDelay = 6.0f; // 장판 생성 후 실제 데미지까지의 딜레이
     [SerializeField] private float floorBiteInterval = 6.0f; // 물기 공격 간격
     [SerializeField] private int floorBiteCount = 3; // 물기 공격 횟수

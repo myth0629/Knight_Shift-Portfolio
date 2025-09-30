@@ -26,9 +26,9 @@
         [Header("공격 설정")]
         [SerializeField] float attackRange = 4f;
         [SerializeField] float closeRange = 2.5f;
-        [SerializeField] float leftPunchDamage = 5f;
-        [SerializeField] float rightPunchDamage = 8f;
-        [SerializeField] float groundSlamDamage = 13f;
+        [SerializeField] float leftPunchDamage = 3f;
+        [SerializeField] float rightPunchDamage = 4f;
+        [SerializeField] float groundSlamDamage = 8f;
         [SerializeField] float attackCooldown = 2f;
         
         // 2페이즈 데미지 증가
@@ -47,8 +47,8 @@
         [SerializeField] GameObject largeEarthquakePrefab;
         [SerializeField] float smallEarthquakeRadius = 8f;
         [SerializeField] float largeEarthquakeRadius = 15f;
-        [SerializeField] float smallEarthquakeDamage = 10f;
-        [SerializeField] float largeEarthquakeDamage = 18f;
+        [SerializeField] float smallEarthquakeDamage = 5f;
+        [SerializeField] float largeEarthquakeDamage = 10f;
 
         private bool isShieldPatternActive = false;
         private GameObject golemShield;
