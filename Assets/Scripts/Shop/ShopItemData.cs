@@ -12,4 +12,7 @@ public class ShopItemData : ScriptableObject
 
     [Header("표시용 (선택)")]
     public Sprite icon;
+
+    // 구매 시 적용할 효과들
+    public ShopEffect[] effects;
 }
