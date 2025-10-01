@@ -54,7 +54,7 @@ public class ShopItemSlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     {
         if (itemData == null) return;
         if (nameText != null) nameText.text = itemData.itemName;
-        if (priceText != null) priceText.text = itemData.price.ToString();
+        if (priceText != null) priceText.text = itemData.price.ToString() + " G";
         if (iconImage != null) iconImage.sprite = itemData.icon;
     }
 
@@ -93,10 +93,9 @@ public class ShopItemSlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
 
         var sb = new StringBuilder();
         sb.AppendLine($"{itemData.itemName}");
-        if (!string.IsNullOrEmpty(itemData.description)) sb.AppendLine(itemData.description);
-        sb.Append($"가격: {itemData.price} G\n구매하시겠습니까?");
+        sb.Append("\n구매하시겠습니까?");
         if (!canAfford)
-            sb.Append("\n골드가 부족합니다.");
+            sb.Append("\n\n골드가 부족합니다.");
 
 
         confirmDialog.Show(sb.ToString(),
