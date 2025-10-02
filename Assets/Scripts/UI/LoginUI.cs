@@ -5,8 +5,11 @@ using UnityEngine.UI;
 
 public class LoginUI : MonoBehaviour
 {
-    public TMP_InputField emailInput;
-    public TMP_InputField passwordInput;
+    public TMP_InputField LoginEmailInput;
+    public TMP_InputField LoginPasswordInput;
+    public TMP_InputField RegisterEmailInput;
+    public TMP_InputField RegisterPasswordInput;
+    public TMP_InputField RegisterPasswordConfirmInput;
     public TMP_Text loginMessageText;
     public TMP_Text registerMessageText;
 
@@ -16,8 +19,8 @@ public class LoginUI : MonoBehaviour
 
     public async void OnClickLogin()
     {
-        string email = emailInput.text;
-        string password = passwordInput.text;
+        string email = LoginEmailInput.text;
+        string password = LoginPasswordInput.text;
 
         bool success = await authManager.Login(email, password);
         if (success)
@@ -35,18 +38,20 @@ public class LoginUI : MonoBehaviour
 
     public async void OnClickRegister()
     {
-        string email = emailInput.text;
-        string password = passwordInput.text;
-        _ = authManager.Register(email, password);
+        string email = RegisterEmailInput.text;
+        string password = RegisterPasswordInput.text;
+        string passwordConfirm = RegisterPasswordConfirmInput.text;
         
-        bool success = await authManager.Register(email, password);
+        bool success = await authManager.Register(email, password, passwordConfirm);
         if (success)
         {
             registerMessageText.text = "회원가입 성공!";
+            registerMessageText.color = Color.green;
         }
         else
         {
-            registerMessageText.text = "회원가입 실패.";
+            registerMessageText.text = "회원가입 실패. 입력 내용을 확인하세요.";
+            registerMessageText.color = Color.red;
         }
     }
 }

@@ -50,7 +50,9 @@ public class PlayerStatUpgradeApplier : MonoBehaviour
             _ => statType.ToString()
         };
 
-        int bonus = PlayerPrefs.GetInt($"{saveKeyPrefix}{suffix}_Bonus", 0);
+        // 계정별 데이터 로드
+        string bonusKey = $"{saveKeyPrefix}{suffix}_Bonus";
+        int bonus = AccountDataManager.GetInt(bonusKey, 0);
         if (bonus <= 0) return;
 
         switch (statType)

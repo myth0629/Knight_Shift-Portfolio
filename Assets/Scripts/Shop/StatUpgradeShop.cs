@@ -12,6 +12,7 @@ public class StatUpgradeShop : MonoBehaviour
     [SerializeField] private TMP_Text goldText;
     [SerializeField] private TMP_Text feedbackText;
     [SerializeField] private float feedbackDuration = 2f;
+    [SerializeField] private UpgradeConfirmPanel confirmPanel;
 
     [Header("설정")]
     [SerializeField] private string requiredSceneName = "Start";
@@ -67,8 +68,12 @@ public class StatUpgradeShop : MonoBehaviour
         {
             if (slot == null) continue;
 
-            int savedLevel = PlayerPrefs.GetInt(StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Level"), 0);
-            int savedBonus = PlayerPrefs.GetInt(StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Bonus"), 0);
+            // 계정별 데이터 로드
+            string levelKey = StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Level");
+            string bonusKey = StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Bonus");
+            
+            int savedLevel = AccountDataManager.GetInt(levelKey, 0);
+            int savedBonus = AccountDataManager.GetInt(bonusKey, 0);
             slot.Initialize(this, savedLevel, savedBonus);
 
             if (shouldApplySaved && savedBonus > 0)
@@ -89,6 +94,40 @@ public class StatUpgradeShop : MonoBehaviour
             ShowFeedback("이미 최대 레벨입니다.");
             return;
         }
+
+        if (playerData == null)
+        {
+            playerData = FindFirstObjectByType<PlayerDataManager>();
+            if (playerData == null)
+            {
+                ShowFeedback("플레이어 데이터가 없습니다.");
+                return;
+            }
+        }
+
+        int cost = slot.GetCurrentCost();
+        if (PlayerGold < cost)
+        {
+            ShowFeedback("골드가 부족합니다.");
+            RefreshAll();
+            return;
+        }
+
+        // 확인 패널 표시
+        if (confirmPanel != null)
+        {
+            confirmPanel.Show(this, slot);
+        }
+        else
+        {
+            // 확인 패널이 없으면 바로 업그레이드
+            ConfirmUpgrade(slot);
+        }
+    }
+
+    public void ConfirmUpgrade(StatUpgradeSlot slot)
+    {
+        if (slot == null) return;
 
         if (playerData == null)
         {
@@ -147,9 +186,13 @@ public class StatUpgradeShop : MonoBehaviour
 
     private void SaveSlot(StatUpgradeSlot slot)
     {
-        PlayerPrefs.SetInt(StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Level"), slot.CurrentLevel);
-        PlayerPrefs.SetInt(StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Bonus"), slot.AccumulatedBonus);
-        PlayerPrefs.Save();
+        // 계정별 데이터 저장
+        string levelKey = StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Level");
+        string bonusKey = StatUpgradeSlot.BuildKey(saveKeyPrefix, slot.Id, "Bonus");
+        
+        AccountDataManager.SetInt(levelKey, slot.CurrentLevel);
+        AccountDataManager.SetInt(bonusKey, slot.AccumulatedBonus);
+        AccountDataManager.Save();
     }
 
     private void RefreshAll()
