@@ -416,6 +416,34 @@ namespace MapSystem
             Debug.Log($"Battle scene counter updated to: {sceneName}");
         }
         
+        // Portal 진입 시 실시간으로 다음 배틀 씬 결정 및 카운터 업데이트
+        public static string GetNextBattleSceneAndUpdate()
+        {
+            // 마지막으로 플레이한 배틀 씬 가져오기
+            string lastScene = AccountDataManager.GetString(LAST_BATTLE_SCENE_KEY, "");
+            
+            string nextScene;
+            
+            // 처음이거나 값이 없으면 랜덤 선택
+            if (string.IsNullOrEmpty(lastScene))
+            {
+                bool pickFirst = Random.value < 0.5f;
+                nextScene = pickFirst ? BATTLE_SCENE_1 : BATTLE_SCENE_2;
+                Debug.Log($"First battle scene (random): {nextScene}");
+            }
+            else
+            {
+                // 이전과 다른 씬 선택 (번갈아가며)
+                nextScene = (lastScene == BATTLE_SCENE_1) ? BATTLE_SCENE_2 : BATTLE_SCENE_1;
+                Debug.Log($"Next battle scene (alternating): {nextScene} (previous was {lastScene})");
+            }
+            
+            // 카운터 업데이트
+            AccountDataManager.SetString(LAST_BATTLE_SCENE_KEY, nextScene);
+            
+            return nextScene;
+        }
+        
         // 노드 연결 생성
         private void ConnectNodesAtLayers(List<MapNode> upperNodes, List<MapNode> lowerNodes)
         {

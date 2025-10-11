@@ -58,11 +58,12 @@ public class Portal : MonoBehaviour
     {
         string targetSceneName = GetSceneName();
         
-        // 배틀 씬으로 진입하는 경우 카운터 업데이트
+        // 배틀 씬인 경우 실시간으로 다음 배틀 씬 결정
         if (!string.IsNullOrEmpty(targetSceneName) && IsBattleScene(targetSceneName))
         {
-            MapController.UpdateBattleSceneCounter(targetSceneName);
-            Debug.Log($"Battle scene counter updated to: {targetSceneName}");
+            // 현재 저장된 마지막 배틀 씬 기준으로 다음 씬 결정
+            targetSceneName = MapSystem.MapController.GetNextBattleSceneAndUpdate();
+            Debug.Log($"Battle scene determined at portal entry: {targetSceneName}");
         }
         
         // 다음 씬에서 현재 노드 정보 이어가기 위해 저장
