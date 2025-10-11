@@ -7,8 +7,8 @@ namespace EnemyAI
     public class EnemyBehaviorTree : MonoBehaviour
     {
         [Header("Ranges")] public float SightRange = 12f; public float SightAngle = 120f; public float HearRange = 6f; public float AttackRange = 2.2f; public float ChaseLeashRange = 25f; public float SearchRadius = 5f; public float SearchDuration = 5f; public float AlertDuration = 1.5f;
-    [Header("Patrol")] public bool UsePatrol = false; public Transform[] PatrolPoints; public float PatrolWait = 1f; public float PatrolArriveThreshold = 0.25f;
-    [Header("Speeds")] public float PatrolSpeed = 2f; public float ChaseSpeed = 3f;
+        [Header("Patrol")] public bool UsePatrol = false; public Transform[] PatrolPoints; public float PatrolWait = 1f; public float PatrolArriveThreshold = 0.25f;
+        [Header("Speeds")] public float PatrolSpeed = 2f; public float ChaseSpeed = 3f;
 
         private NavMeshAgent agent; private Animator anim; private EnemyBlackboard bb; private BTNode root;
         private int patrolIndex = 0; private float patrolWaitTimer = 0f; private EnemyHealth health;

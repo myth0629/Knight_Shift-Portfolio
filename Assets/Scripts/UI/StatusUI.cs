@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
-public class StatusUI : MonoBehaviour
+public class StatusUI : MonoBehaviour, IUIPanel
 {
     [Header("스테이터스 UI 요소들")]
     public TextMeshProUGUI levelText;
@@ -27,6 +27,21 @@ public class StatusUI : MonoBehaviour
     {
         // 컴포넌트 참조 가져오기
         playerStatus = FindFirstObjectByType<PlayerStatus>();
+        
+        // UIPanelManager에 등록
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.RegisterPanel(this);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // UIPanelManager에서 등록 해제
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.UnregisterPanel(this);
+        }
     }
     
     private void InitializeWeaponReferences()
@@ -79,6 +94,12 @@ public class StatusUI : MonoBehaviour
                 // 마우스 커서 보이게 & 잠금 해제
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                
+                // UIPanelManager에 패널이 열렸음을 알림
+                if (UIPanelManager.Instance != null)
+                {
+                    UIPanelManager.Instance.OnPanelOpened(this);
+                }
             }
             else
             {
@@ -86,6 +107,24 @@ public class StatusUI : MonoBehaviour
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
             }
+        }
+    }
+
+    // IUIPanel 인터페이스 구현
+    public bool IsOpen()
+    {
+        return statusPanel != null && statusPanel.activeSelf;
+    }
+
+    public void Close()
+    {
+        if (statusPanel != null && statusPanel.activeSelf)
+        {
+            statusPanel.SetActive(false);
+            
+            // 마우스 커서 숨기고 잠금
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
     

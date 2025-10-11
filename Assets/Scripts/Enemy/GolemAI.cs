@@ -12,6 +12,12 @@
         public float currentHp;
         private bool isDead = false; public bool IsDead() => isDead;
         [SerializeField] int dropGold = 3000; // 골렘 처치 시 드랍되는 골드 양
+        
+        [Header("피격 사운드")]
+        [SerializeField] private AudioClip[] hitSounds;
+        [SerializeField] private float hitSoundVolume = 0.8f;
+        
+        private AudioSource audioSource;
 
         [Header("페이즈 설정")]
         [SerializeField] float phase2HpThreshold = 0.5f; // HP 50% 이하에서 2페이즈
@@ -165,6 +171,17 @@
         if (useBehaviorTree)
         {
             golemBehaviorTree = GetComponent<GolemBehaviorTree>();
+        }
+        
+        // AudioSource 초기화
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f; // 3D 사운드
+            audioSource.rolloffMode = AudioRolloffMode.Linear;
+            audioSource.maxDistance = 40f;
         }
            
         }
@@ -761,6 +778,9 @@
 
             currentHp -= damageAmount;
             
+            // 피격 사운드 재생
+            PlayHitSound();
+            
             // 체력바 업데이트 (페이즈 파라미터 제거)
             bossHealthBar?.UpdateHealth(currentHp);
             
@@ -769,6 +789,18 @@
             if (currentHp <= 0)
             {
                 Die();
+            }
+        }
+        
+        private void PlayHitSound()
+        {
+            if (hitSounds != null && hitSounds.Length > 0 && audioSource != null && !isDead)
+            {
+                AudioClip clip = hitSounds[Random.Range(0, hitSounds.Length)];
+                if (clip != null)
+                {
+                    audioSource.PlayOneShot(clip, hitSoundVolume);
+                }
             }
         }
 

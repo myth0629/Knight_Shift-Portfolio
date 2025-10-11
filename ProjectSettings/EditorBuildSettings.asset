@@ -21,6 +21,9 @@ EditorBuildSettings:
     path: Assets/Scenes/GameScene/Battle-Cave.unity
     guid: 6acc7e58ec758455cbb4adacb8463ffc
   - enabled: 1
+    path: Assets/Scenes/GameScene/Battle-Dungeon.unity
+    guid: a1ec07a775196453689402c3810db872
+  - enabled: 1
     path: Assets/Scenes/GameScene/Boss - 1.unity
     guid: 7d1b44088bfc44233a01aa42e4241eb0
   - enabled: 1

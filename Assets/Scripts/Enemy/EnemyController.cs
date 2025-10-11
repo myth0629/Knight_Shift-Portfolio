@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 public class EnemyController : MonoBehaviour, IDamageable
 {
@@ -9,16 +10,35 @@ public class EnemyController : MonoBehaviour, IDamageable
     [SerializeField] private float attackDamage = 20f; // 무기 초기화용
 
     [Header("Flags (읽기전용)")] public bool isDead = false;
+    
+    [Header("피격 사운드")]
+    [SerializeField] private AudioClip[] hitSounds;
+    [SerializeField] private float hitSoundVolume = 0.5f;
 
     private Weapon weapon;
     private Animator animator;
     private PlayerDataManager playerData;
+    private NavMeshAgent navmesh;
+    private AudioSource audioSource;
+
 
     private void Awake()
     {
         weapon = GetComponentInChildren<Weapon>();
         animator = GetComponent<Animator>();
         playerData = FindFirstObjectByType<PlayerDataManager>();
+        navmesh = GetComponent<NavMeshAgent>();
+        
+        // AudioSource 초기화
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f; // 3D 사운드
+            audioSource.rolloffMode = AudioRolloffMode.Linear;
+            audioSource.maxDistance = 30f;
+        }
     }
 
     void Start()
@@ -34,11 +54,27 @@ public class EnemyController : MonoBehaviour, IDamageable
     {
         Debug.Log("Skeleton Damage Taken: " + damageAmount);
         currentHp -= damageAmount;
+        
+        // 피격 사운드 재생
+        PlayHitSound();
+        
         if (!isDead && animator != null) animator.SetTrigger("Hit");
         if (currentHp <= 0)
         {
             currentHp = 0;
             Die();
+        }
+    }
+    
+    private void PlayHitSound()
+    {
+        if (hitSounds != null && hitSounds.Length > 0 && audioSource != null && !isDead)
+        {
+            AudioClip clip = hitSounds[Random.Range(0, hitSounds.Length)];
+            if (clip != null)
+            {
+                audioSource.PlayOneShot(clip, hitSoundVolume);
+            }
         }
     }
     
@@ -48,8 +84,11 @@ public class EnemyController : MonoBehaviour, IDamageable
         if (animator != null) animator.SetTrigger("Death");
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
+
+        navmesh.enabled = false;
+        
         // 골드 지급: 플레이어 데이터 시스템이 존재할 때만
-        // playerData?.AddGold(dropGold);
+        playerData?.AddGold(dropGold);
 
         LockOnSystem lockOn = FindFirstObjectByType<LockOnSystem>();
         if (lockOn != null)

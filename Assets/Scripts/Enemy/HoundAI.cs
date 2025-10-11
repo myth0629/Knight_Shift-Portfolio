@@ -11,7 +11,13 @@ public class HoundAI : MonoBehaviour, IDamageable
     private bool isDead = false;
     private bool isInvincible = false; // 무적 상태 플래그
 
-    [SerializeField] int dropGold = 3000; 
+    [SerializeField] int dropGold = 3000;
+    
+    [Header("피격 사운드")]
+    [SerializeField] private AudioClip[] hitSounds;
+    [SerializeField] private float hitSoundVolume = 0.8f;
+    
+    private AudioSource audioSource; 
 
     [Header("보스 설정")]
     [SerializeField] bool isBoss = true;
@@ -590,6 +596,17 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         if (useBehaviorTree && houndBehaviorTree == null)
         {
             houndBehaviorTree = GetComponent<HoundBehaviorTree>();
+        }
+        
+        // AudioSource 초기화 (피격 사운드용)
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f; // 3D 사운드
+            audioSource.rolloffMode = AudioRolloffMode.Linear;
+            audioSource.maxDistance = 40f;
         }
     }
 
@@ -1808,6 +1825,10 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
 
         lastDamageTime = Time.time;
         currentHp -= damageAmount;
+        
+        // 피격 사운드 재생
+        PlayHitSound();
+        
         bossHealthBar?.UpdateHealth(currentHp);
         Debug.Log($"하운드가 {damageAmount} 데미지를 받았습니다. 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")})");
         if (!isPhase2 && !isPhaseTransitionTriggered &&
@@ -1820,6 +1841,18 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         if (currentHp <= 0)
         {
             Die();
+        }
+    }
+    
+    private void PlayHitSound()
+    {
+        if (hitSounds != null && hitSounds.Length > 0 && audioSource != null && !isDead)
+        {
+            AudioClip clip = hitSounds[Random.Range(0, hitSounds.Length)];
+            if (clip != null)
+            {
+                audioSource.PlayOneShot(clip, hitSoundVolume);
+            }
         }
     }
 

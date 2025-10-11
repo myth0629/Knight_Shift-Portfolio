@@ -5,20 +5,30 @@ using UnityEngine.SceneManagement;
 
 public class Portal : MonoBehaviour
 {
-    [SerializeField] private string sceneName; // 전환할 씬 이름
+    [SerializeField] private string defaultSceneName; // Inspector에서 설정하는 기본 씬 이름 (백업용)
     [SerializeField] private int sceneNumber;
     
     // 노드 ID 저장용 변수
     private int nodeId = -1;
     
+    // 동적으로 설정된 씬 이름 (런타임에 SetSceneName으로 설정)
+    private string runtimeSceneName = null;
+    
     // 포털 클릭 이벤트를 위한 델리게이트
     public delegate void PortalClickedHandler(int nodeId);
     public static event PortalClickedHandler OnPortalClicked;
 
-    // 씬 이름 설정 메서드
+    // 씬 이름 설정 메서드 (런타임에 동적으로 설정)
     public void SetSceneName(string name)
     {
-        sceneName = name;
+        runtimeSceneName = name;
+        Debug.Log($"Portal scene name set to: {name}");
+    }
+    
+    // 실제 사용할 씬 이름 가져오기 (런타임 설정 우선, 없으면 기본값)
+    private string GetSceneName()
+    {
+        return !string.IsNullOrEmpty(runtimeSceneName) ? runtimeSceneName : defaultSceneName;
     }
     
     // 노드 ID 설정 메서드
@@ -46,6 +56,15 @@ public class Portal : MonoBehaviour
     // 씬 전환을 위한 코루틴
     private IEnumerator TransitionToScene()
     {
+        string targetSceneName = GetSceneName();
+        
+        // 배틀 씬으로 진입하는 경우 카운터 업데이트
+        if (!string.IsNullOrEmpty(targetSceneName) && IsBattleScene(targetSceneName))
+        {
+            MapController.UpdateBattleSceneCounter(targetSceneName);
+            Debug.Log($"Battle scene counter updated to: {targetSceneName}");
+        }
+        
         // 다음 씬에서 현재 노드 정보 이어가기 위해 저장
         PlayerPrefs.SetInt("SelectedNodeId", nodeId);
         PlayerPrefs.Save();
@@ -67,10 +86,10 @@ public class Portal : MonoBehaviour
         
         // 씬 로드 시작
         AsyncOperation asyncLoad = null;
-        if (!string.IsNullOrEmpty(sceneName))
+        if (!string.IsNullOrEmpty(targetSceneName))
         {
-            asyncLoad = SceneManager.LoadSceneAsync(sceneName);
-            Debug.Log($"씬 '{sceneName}'을(를) 로드합니다.");
+            asyncLoad = SceneManager.LoadSceneAsync(targetSceneName);
+            Debug.Log($"씬 '{targetSceneName}'을(를) 로드합니다.");
         }
         else if (sceneNumber >= 0)
         {
@@ -89,5 +108,12 @@ public class Portal : MonoBehaviour
         }
         
         Debug.Log("씬 전환이 완료되었습니다.");
+    }
+    
+    // 배틀 씬인지 확인하는 헬퍼 메서드
+    private bool IsBattleScene(string scene)
+    {
+        // 배틀 씬 이름들과 비교 (Battle, Battle-Cave, Battle-Dungeon 등)
+        return scene.StartsWith("Battle");
     }
 }

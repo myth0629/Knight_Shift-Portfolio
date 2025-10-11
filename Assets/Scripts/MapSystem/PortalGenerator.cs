@@ -146,7 +146,14 @@ public class PortalGenerator : MonoBehaviour
             portalComponent.SetNodeId(node.id);
             Debug.Log($"Set nodeId {node.id} to Portal component");
 
-            // 보스 노드라면 50/50로 보스 씬을 랜덤 지정
+            // 노드의 씬 이름 설정 (MapController에서 이미 번갈아가는 로직 적용됨)
+            if (!string.IsNullOrEmpty(node.sceneName))
+            {
+                portalComponent.SetSceneName(node.sceneName);
+                Debug.Log($"Portal set to scene '{node.sceneName}' for node type {node.nodeType}");
+            }
+            
+            // 보스 노드라면 추가로 50/50 랜덤 보스 씬 지정 (기존 로직 유지)
             if (node.nodeType == NodeType.Boss)
             {
                 string bossScene = GetRandomBossSceneName();

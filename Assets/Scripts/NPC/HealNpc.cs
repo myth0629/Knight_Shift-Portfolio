@@ -8,7 +8,7 @@ using UnityEngine.InputSystem;
 // - 확인 버튼: HP/SP를 전부 회복하고 패널 닫기
 // - 취소 버튼: 패널만 닫기
 // - 패널 열림/닫힘 시 커서/카메라/입력 상태 전환
-public class HealNpc : MonoBehaviour
+public class HealNpc : MonoBehaviour, IUIPanel
 {
     [Header("상호작용 설정")]
     [SerializeField] private float interactionDistance = 3f;
@@ -41,6 +41,21 @@ public class HealNpc : MonoBehaviour
         input = FindFirstObjectByType<PlayerInput>();
 
         if (healPanel != null) healPanel.SetActive(false);
+        
+        // UIPanelManager에 등록
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.RegisterPanel(this);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // UIPanelManager에서 등록 해제
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.UnregisterPanel(this);
+        }
     }
 
     private void Update()
@@ -74,6 +89,12 @@ public class HealNpc : MonoBehaviour
 
         // 게임 일시정지 (선택사항)
         Time.timeScale = 0f;
+        
+        // UIPanelManager에 패널이 열렸음을 알림
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.OnPanelOpened(this);
+        }
     }
 
     public void ClosePanel()
@@ -113,6 +134,17 @@ public class HealNpc : MonoBehaviour
 
     // 취소 버튼용 - 패널만 닫기
     public void OnCancel()
+    {
+        ClosePanel();
+    }
+
+    // IUIPanel 인터페이스 구현
+    public bool IsOpen()
+    {
+        return isPanelOpen && healPanel != null && healPanel.activeSelf;
+    }
+
+    public void Close()
     {
         ClosePanel();
     }

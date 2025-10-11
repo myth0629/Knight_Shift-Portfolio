@@ -8,6 +8,12 @@ public class BearAI : MonoBehaviour, IDamageable
     private float currentHp;
     private bool isDead = false;
     private bool isHit = false; // hit 애니메이션 재생 중인지 여부
+    
+    [Header("피격 사운드")]
+    [SerializeField] private AudioClip[] hitSounds;
+    [SerializeField] private float hitSoundVolume = 0.7f;
+    
+    private AudioSource audioSource;
 
     [Header("공격 설정")]
     [SerializeField] float attackRange = 2.5f;
@@ -53,6 +59,17 @@ public class BearAI : MonoBehaviour, IDamageable
         if (biteCollider) biteCollider.damageAmount = biteDamage;
         if (rightPawCollider) rightPawCollider.damageAmount = rightPawDamage;
         if (leftPawCollider) leftPawCollider.damageAmount = leftPawDamage;
+        
+        // AudioSource 초기화
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 1f; // 3D 사운드
+            audioSource.rolloffMode = AudioRolloffMode.Linear;
+            audioSource.maxDistance = 30f;
+        }
     }
 
     void Start()
@@ -185,6 +202,9 @@ public class BearAI : MonoBehaviour, IDamageable
 
         currentHp -= damageAmount;
         Debug.Log($"{name} 피격! 남은 체력: {currentHp}");
+        
+        // 피격 사운드 재생
+        PlayHitSound();
 
         animator.SetTrigger("Hit");
         isHit = true; // Hit 상태 설정
@@ -192,6 +212,18 @@ public class BearAI : MonoBehaviour, IDamageable
         if (currentHp <= 0)
         {
             Die();
+        }
+    }
+    
+    private void PlayHitSound()
+    {
+        if (hitSounds != null && hitSounds.Length > 0 && audioSource != null && !isDead)
+        {
+            AudioClip clip = hitSounds[Random.Range(0, hitSounds.Length)];
+            if (clip != null)
+            {
+                audioSource.PlayOneShot(clip, hitSoundVolume);
+            }
         }
     }
 

@@ -2,7 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class UpgradeConfirmPanel : MonoBehaviour
+public class UpgradeConfirmPanel : MonoBehaviour, IUIPanel
 {
     [Header("UI 참조")]
     [SerializeField] private GameObject panelObject;
@@ -26,6 +26,15 @@ public class UpgradeConfirmPanel : MonoBehaviour
         Hide();
     }
 
+    private void Start()
+    {
+        // UIPanelManager에 등록
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.RegisterPanel(this);
+        }
+    }
+
     private void OnDestroy()
     {
         if (confirmButton != null)
@@ -33,6 +42,12 @@ public class UpgradeConfirmPanel : MonoBehaviour
 
         if (cancelButton != null)
             cancelButton.onClick.RemoveListener(OnCancelClicked);
+
+        // UIPanelManager에서 등록 해제
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.UnregisterPanel(this);
+        }
     }
 
     public void Show(StatUpgradeShop upgradeShop, StatUpgradeSlot slot)
@@ -66,6 +81,12 @@ public class UpgradeConfirmPanel : MonoBehaviour
             panelObject.SetActive(true);
         else
             gameObject.SetActive(true);
+
+        // UIPanelManager에 패널이 열렸음을 알림
+        if (UIPanelManager.Instance != null)
+        {
+            UIPanelManager.Instance.OnPanelOpened(this);
+        }
     }
 
     public void Hide()
@@ -89,6 +110,20 @@ public class UpgradeConfirmPanel : MonoBehaviour
     }
 
     private void OnCancelClicked()
+    {
+        Hide();
+    }
+
+    // IUIPanel 인터페이스 구현
+    public bool IsOpen()
+    {
+        if (panelObject != null)
+            return panelObject.activeSelf;
+        else
+            return gameObject.activeSelf;
+    }
+
+    public void Close()
     {
         Hide();
     }

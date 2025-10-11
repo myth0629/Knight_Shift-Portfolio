@@ -111,11 +111,15 @@ namespace MapSystem
         public event MapNodeSelectedHandler OnNodeSelected;
         
         // 씬 이름
-        private const string BATTLE_SCENE = "Battle";
+        private const string BATTLE_SCENE_1 = "Battle-Cave";
+        private const string BATTLE_SCENE_2 = "Battle-Dungeon"; // 새로운 배틀 씬
         private const string SHOP_SCENE = "Shop";
         private const string CAMP_SCENE = "Camp";
         private const string BOSS_SCENE = "Boss";
         private const string START_SCENE = "Battle";
+        
+        // AccountDataManager 키
+        private const string LAST_BATTLE_SCENE_KEY = "LastBattleScene";
         
         private void Awake()
         {
@@ -356,13 +360,60 @@ namespace MapSystem
         {
             switch (type)
             {
-                case NodeType.Battle: return BATTLE_SCENE;
+                case NodeType.Battle: return GetNextBattleSceneName();
                 case NodeType.Shop: return SHOP_SCENE;
                 case NodeType.Camp: return CAMP_SCENE;
                 case NodeType.Boss: return BOSS_SCENE;
-                case NodeType.Start: return START_SCENE;
-                default: return BATTLE_SCENE;
+                case NodeType.Start: return GetInitialBattleSceneName();
+                default: return GetNextBattleSceneName();
             }
+        }
+        
+        // 처음 시작할 때 랜덤으로 배틀 씬 선택 (카운터 업데이트 없이 이름만 반환)
+        private string GetInitialBattleSceneName()
+        {
+            // AccountDataManager에서 마지막 배틀 씬 확인
+            string lastScene = AccountDataManager.GetString(LAST_BATTLE_SCENE_KEY, "");
+            
+            // 처음이거나 값이 없으면 랜덤 선택
+            if (string.IsNullOrEmpty(lastScene))
+            {
+                bool pickFirst = Random.value < 0.5f;
+                string selectedScene = pickFirst ? BATTLE_SCENE_1 : BATTLE_SCENE_2;
+                Debug.Log($"Initial battle scene selected randomly: {selectedScene}");
+                return selectedScene;
+            }
+            
+            // 이미 기록이 있으면 번갈아가는 씬 이름만 반환 (업데이트는 하지 않음)
+            return GetNextBattleSceneName();
+        }
+        
+        // 다음 배틀 씬 이름만 반환 (카운터 업데이트는 Portal에서 수행)
+        private string GetNextBattleSceneName()
+        {
+            // 마지막으로 플레이한 배틀 씬 가져오기
+            string lastScene = AccountDataManager.GetString(LAST_BATTLE_SCENE_KEY, "");
+            
+            // 처음이거나 값이 없으면 랜덤 선택
+            if (string.IsNullOrEmpty(lastScene))
+            {
+                bool pickFirst = Random.value < 0.5f;
+                string selectedScene = pickFirst ? BATTLE_SCENE_1 : BATTLE_SCENE_2;
+                Debug.Log($"First battle scene name: {selectedScene} (will be saved when portal entered)");
+                return selectedScene;
+            }
+            
+            // 이전과 다른 씬 이름 반환 (업데이트는 Portal에서)
+            string nextScene = (lastScene == BATTLE_SCENE_1) ? BATTLE_SCENE_2 : BATTLE_SCENE_1;
+            Debug.Log($"Next battle scene name: {nextScene} (previous was {lastScene}, will be saved when portal entered)");
+            return nextScene;
+        }
+        
+        // 배틀 씬 카운터 업데이트 (Portal에서 호출)
+        public static void UpdateBattleSceneCounter(string sceneName)
+        {
+            AccountDataManager.SetString(LAST_BATTLE_SCENE_KEY, sceneName);
+            Debug.Log($"Battle scene counter updated to: {sceneName}");
         }
         
         // 노드 연결 생성

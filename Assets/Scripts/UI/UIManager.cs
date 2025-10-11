@@ -14,12 +14,30 @@ public class UIManager : MonoBehaviour
     
     PlayerInput input;
     private bool isPanelOpen = false;
+    
+    private UIManagerPanelWrapper slotPanelWrapper;
+    private UIManagerPanelWrapper shopPanelWrapper;
 
     private void Start()
     {
         slotPanel = FindInactiveObjectByName("SlotPanel");
         vcam = FindFirstObjectByType<CinemachineCamera>();
         input = FindFirstObjectByType<PlayerInput>();
+        
+        // 래퍼 찾기
+        var wrappers = FindObjectsByType<UIManagerPanelWrapper>(FindObjectsSortMode.None);
+        foreach (var wrapper in wrappers)
+        {
+            // 래퍼가 관리하는 패널에 따라 할당
+            if (wrapper.gameObject.name.Contains("Slot") || wrapper.gameObject.name.Contains("Upgrade"))
+            {
+                slotPanelWrapper = wrapper;
+            }
+            else if (wrapper.gameObject.name.Contains("Shop"))
+            {
+                shopPanelWrapper = wrapper;
+            }
+        }
     }
 
     private GameObject FindInactiveObjectByName(string name)
@@ -51,6 +69,12 @@ public class UIManager : MonoBehaviour
             
             // 카메라 시점 이동 금지
             vcam.gameObject.SetActive(false);
+            
+            // UIPanelManager에 패널이 열렸음을 알림
+            if (slotPanelWrapper != null)
+            {
+                slotPanelWrapper.OnPanelOpened();
+            }
         }
         else
         {
@@ -81,6 +105,12 @@ public class UIManager : MonoBehaviour
             
             // 카메라 시점 이동 금지
             vcam.gameObject.SetActive(false);
+            
+            // UIPanelManager에 패널이 열렸음을 알림
+            if (shopPanelWrapper != null)
+            {
+                shopPanelWrapper.OnPanelOpened();
+            }
         }
         else
         {
