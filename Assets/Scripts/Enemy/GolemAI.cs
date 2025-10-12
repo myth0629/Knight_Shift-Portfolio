@@ -670,6 +670,9 @@
             Vector3 golemForward = transform.forward;
             Vector3 startPosition = transform.position + golemForward * 1f;
             
+            // 이번 공격에서 피해를 입은 대상을 기록할 공유 리스트를 생성합니다.
+            var hitTargets = new System.Collections.Generic.List<Collider>();
+
             for (int i = 0; i < spikeCount; i++)
             {
                 Vector3 spikePosition = startPosition + golemForward * i * (spikeDistance / spikeCount);
@@ -692,7 +695,9 @@
                     }
                     // 2페이즈에서는 바닥치기 데미지도 증가
                     float finalDamage = groundSlamDamage * (isPhase2 ? phase2DamageMultiplier : 1f);
-                    spikeScript.Initialize(finalDamage);
+                    
+                    // 공유할 피격 대상 리스트를 함께 전달합니다.
+                    spikeScript.Initialize(finalDamage, hitTargets);
                 }
                 
                 yield return new WaitForSeconds(spikeDelay);

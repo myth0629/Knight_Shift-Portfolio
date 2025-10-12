@@ -16,12 +16,23 @@ public class StageManager : MonoBehaviour
     [Header("스폰 위치")]
     public Transform bossSpawnPoint;
 
+    [Header("일반 몬스터 설정")]
+    [Tooltip("생성할 일반 몬스터 프리팹 목록 (현재 2종)")]
+    public GameObject[] normalMonsterPrefabs;
+
+    [Tooltip("스테이지 1에서 생성할 기본 몬스터 수")]
+    public int baseMonsterCount = 3;
+
+    [Tooltip("스테이지 레벨당 증가할 몬스터 수")]
+    public int monsterCountIncreasePerLevel = 1;
+
     [Header("현재 상태 (읽기전용)")]
     [SerializeField] private int currentStage; // 영구 스테이지 레벨
-    [SerializeField] private GameObject currentBoss;
-
-    public int CurrentStage => currentStage;
-
+            [SerializeField] private GameObject currentBoss;
+    
+            public int BossKillsThisRun { get; private set; } = 0;
+    
+            public int CurrentStage => currentStage;
     [Header("씬 설정")]
     [SerializeField] private string startSceneName = "Start";
 
@@ -34,21 +45,19 @@ public class StageManager : MonoBehaviour
     public event Action<int> OnStageStarted;    // 스테이지 시작시 (스테이지 번호)
     public event Action<int> OnStageCleared;    // 스테이지 클리어시 (스테이지 번호)
 
-    void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
-
-        // 영구 스테이지 레벨 로드
-        currentStage = PlayerPrefs.GetInt(StageLevelKey, defaultStageLevel);
-    }
-
-    void Start()
+                    void Awake()
+                    {
+                        if (Instance != null && Instance != this)
+                        {
+                            Destroy(gameObject);
+                            return;
+                        }
+                        Instance = this;
+                        DontDestroyOnLoad(gameObject);
+                
+                        // 영구 스테이지 레벨 로드
+                        currentStage = PlayerPrefs.GetInt(StageLevelKey, defaultStageLevel);
+                    }    void Start()
     {
         // 자동 보스 스폰은 하지 않는다. (포탈을 통해 보스 씬으로 이동)
         OnStageStarted?.Invoke(currentStage);

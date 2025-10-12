@@ -7,7 +7,8 @@ namespace EnemyAI
     public class EnemyBehaviorTree : MonoBehaviour
     {
         [Header("Ranges")] public float SightRange = 12f; public float SightAngle = 120f; public float HearRange = 6f; public float AttackRange = 2.2f; public float ChaseLeashRange = 25f; public float SearchRadius = 5f; public float SearchDuration = 5f; public float AlertDuration = 1.5f;
-        [Header("Patrol")] public bool UsePatrol = false; public Transform[] PatrolPoints; public float PatrolWait = 1f; public float PatrolArriveThreshold = 0.25f;
+                [Header("Patrol")] public bool UsePatrol = false; public Vector3[] PatrolPoints; public float PatrolWait = 1f; public float PatrolArriveThreshold = 0.25f;
+        [Header("Dynamic Patrol")] public bool GenerateDynamicPatrol = true; public int DynamicPatrolPointsCount = 3; public float DynamicPatrolRadius = 7f;
         [Header("Speeds")] public float PatrolSpeed = 2f; public float ChaseSpeed = 3f;
 
         private NavMeshAgent agent; private Animator anim; private EnemyBlackboard bb; private BTNode root;
@@ -28,6 +29,35 @@ namespace EnemyAI
                 InAttackRange = false,
                 AlertTimer = 0f
             };
+
+            if (UsePatrol && (PatrolPoints == null || PatrolPoints.Length == 0) && GenerateDynamicPatrol)
+            {
+                GeneratePatrolPoints();
+            }
+        }
+
+        private void GeneratePatrolPoints()
+        {
+            var points = new System.Collections.Generic.List<Vector3>();
+            for (int i = 0; i < DynamicPatrolPointsCount; i++)
+            {
+                Vector2 randomCircle = Random.insideUnitCircle * DynamicPatrolRadius;
+                Vector3 randomPoint = bb.SpawnPosition + new Vector3(randomCircle.x, 0, randomCircle.y);
+
+                if (NavMesh.SamplePosition(randomPoint, out NavMeshHit hit, DynamicPatrolRadius, NavMesh.AllAreas))
+                {
+                    points.Add(hit.position);
+                }
+            }
+            if (points.Count > 0)
+            {
+                PatrolPoints = points.ToArray();
+            }
+            else
+            {
+                // If we failed to find any points, disable patrol for this instance
+                UsePatrol = false;
+            }
         }
 
         private void Start()
@@ -195,7 +225,7 @@ namespace EnemyAI
                     if ((!initialized || !ctx.agent.hasPath || ctx.agent.destination == ctx.transform.position) && nextSetDestCooldown <= 0f)
                     {
                         initialized = true;
-                        ctx.agent.SetDestination(ctx.PatrolPoints[ctx.patrolIndex].position);
+                        ctx.agent.SetDestination(ctx.PatrolPoints[ctx.patrolIndex]);
                         nextSetDestCooldown = 0.1f; // 과도한 재설정 방지
                     }
 
@@ -205,7 +235,7 @@ namespace EnemyAI
                     }
 
                     // 실제 목적지까지의 평면 거리 (remainingDistance가 순간 0 되는 플리커 방지)
-                    Vector3 dest = ctx.PatrolPoints[ctx.patrolIndex].position;
+                    Vector3 dest = ctx.PatrolPoints[ctx.patrolIndex];
                     float planarDist = Vector3.Distance(new Vector3(dest.x, 0f, dest.z), new Vector3(ctx.transform.position.x, 0f, ctx.transform.position.z));
                     float speed = new Vector3(ctx.agent.velocity.x, 0f, ctx.agent.velocity.z).magnitude;
 
@@ -216,7 +246,7 @@ namespace EnemyAI
                         if (ctx.patrolWaitTimer >= ctx.PatrolWait)
                         {
                             ctx.patrolIndex = (ctx.patrolIndex + 1) % ctx.PatrolPoints.Length;
-                            ctx.agent.SetDestination(ctx.PatrolPoints[ctx.patrolIndex].position);
+                            ctx.agent.SetDestination(ctx.PatrolPoints[ctx.patrolIndex]);
                             ctx.patrolWaitTimer = 0f;
                             nextSetDestCooldown = 0.1f;
                         }
