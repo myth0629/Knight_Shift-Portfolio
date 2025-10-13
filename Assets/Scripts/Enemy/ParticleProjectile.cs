@@ -1,16 +1,29 @@
 using UnityEngine;
 
+[RequireComponent(typeof(AudioSource))]
 public class ParticleProjectile : MonoBehaviour
 {
     [Header("투사체 설정")]
     [SerializeField] private float projectileSize = 0.5f; // 투사체 크기
     [SerializeField] private float collisionRadius = 0.5f; // 충돌 감지 반경
+
+    [Header("사운드 설정")]
+    [SerializeField] private AudioClip launchSound;
+    [SerializeField] private AudioClip hitSound;
+    
     private Vector3 moveDirection;
     private float speed;
     private float damage;
     private float lifetime;
     private ParticleSystem particles;
     private bool hasHit = false;
+    private AudioSource audioSource;
+
+    void Awake()
+    {
+        audioSource = GetComponent<AudioSource>();
+        audioSource.playOnAwake = false;
+    }
     
     public void Initialize(Vector3 direction, float projectileSpeed, float projectileDamage, float life)
     {
@@ -18,6 +31,11 @@ public class ParticleProjectile : MonoBehaviour
         speed = projectileSpeed;
         damage = projectileDamage;
         lifetime = life;
+
+        if (launchSound != null)
+        {
+            audioSource.PlayOneShot(launchSound);
+        }
         
         particles = GetComponent<ParticleSystem>();
         if (particles != null)
@@ -74,21 +92,27 @@ public class ParticleProjectile : MonoBehaviour
                         Debug.Log($"투사체 데미지 적용! {damage} 데미지");
                     }
                     
-                    HitEffect();
+                    HitEffect(hit.point);
                 }
                 else if (!hit.transform.CompareTag("Enemy") && !hit.transform.CompareTag("Projectile"))
                 {
                 // Enemy와 Projectile 태그가 아닌 모든 오브젝트와 충돌 시 사라짐
                 Debug.Log($"투사체가 {hit.transform.name}에 충돌하여 사라짐");
-                HitEffect();
+                HitEffect(hit.point);
                 }
             }
         }
     }
     
-    void HitEffect()
+    void HitEffect(Vector3 hitPoint)
     {
+        if (hasHit) return;
         hasHit = true;
+
+        if (hitSound != null)
+        {
+            AudioSource.PlayClipAtPoint(hitSound, hitPoint);
+        }
         
         // 파티클 정지
         if (particles != null)

@@ -16,6 +16,22 @@ public class HoundAI : MonoBehaviour, IDamageable
     [Header("피격 사운드")]
     [SerializeField] private AudioClip[] hitSounds;
     [SerializeField] private float hitSoundVolume = 0.8f;
+
+    [Header("공격 사운드")]
+    [SerializeField] private AudioClip foxCrySound;
+    [SerializeField] private AudioClip biteSound;
+    [SerializeField] private AudioClip dashAttackSound;
+    [SerializeField] private AudioClip leftAttackSound;
+    [SerializeField] private AudioClip rightAttackSound;
+    [SerializeField] private AudioClip tongueBiteSound;
+    [SerializeField] private AudioClip jumpAttackSound;
+
+    [SerializeField] private AudioClip spawnSound;
+    [SerializeField] private AudioClip deathSound;
+
+    [Header("인카운터 설정")]
+    [SerializeField] private float encounterRange = 20f; // 플레이어 감지 및 조우 사운드 재생 범위
+    private bool hasPlayedEncounterSound = false; // 조우 사운드 재생 여부
     
     private AudioSource audioSource; 
 
@@ -283,6 +299,7 @@ public class HoundAI : MonoBehaviour, IDamageable
     IEnumerator ChargeAttackPattern()
     {
         isCharging = true;
+        PlaySound(dashAttackSound);
         SafeStopAgent();
 
         Vector3 chargeDirection = (player.position - transform.position).normalized;
@@ -644,6 +661,17 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
     {
         if (isDead || player == null) return;
 
+        // 플레이어 첫 조우 시 사운드 재생
+        if (!hasPlayedEncounterSound)
+        {
+            if (Vector3.Distance(transform.position, player.position) < encounterRange)
+            {
+                PlaySound(spawnSound);
+                hasPlayedEncounterSound = true;
+                Debug.Log("플레이어 발견! 조우 사운드를 재생합니다.");
+            }
+        }
+
         // 페이즈 전환 패턴이 실행 중일 때는 다른 모든 로직을 중단하고 제자리에 고정시킵니다.
         if (isPhaseTransitionTriggered)
         {
@@ -709,10 +737,8 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
     public void PerformProjectileAttack()
     {
         if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
-
-        if (projectileAttackTimer > 0) return; // 쿨다운 체크
-
-        if (isProjectileAttacking) return;
+        if (isAttacking || attackTimer > 0) return; // 메인 공격 타이머 사용
+        if (isProjectileAttacking || isFiringSpiritArrows) return; // 다른 원거리 공격 중인지 확인
 
         // Behavior Tree 사용 시 공격 상태 설정
         if (useBehaviorTree && houndBehaviorTree != null)
@@ -720,13 +746,17 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             houndBehaviorTree.SetAttacking(true);
         }
 
+        isAttacking = true; // 메인 공격 플래그 설정
+        isProjectileAttacking = true;
+        attackTimer = projectileAttackCooldown; // 메인 공격 타이머 설정
+
         StartCoroutine(ProjectileAttackPattern());
-        projectileAttackTimer = projectileAttackCooldown; // 쿨다운 시작
         Debug.Log($"투사체 공격 실행 - 다음 투사체까지 {projectileAttackCooldown}초 대기");
     }
     IEnumerator ProjectileAttackPattern()
     {
-        isProjectileAttacking = true;
+        SafeStopAgent();
+        // isProjectileAttacking = true; // PerformProjectileAttack에서 이미 설정됨
         
         // FrontPawAttack 애니메이션 사용
         animator.SetTrigger("FrontPawAttack");
@@ -742,6 +772,7 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
         
         isProjectileAttacking = false;
+        isAttacking = false; // 메인 공격 플래그 해제
         
         // Behavior Tree 사용 시 공격 상태 해제
         if (useBehaviorTree && houndBehaviorTree != null)
@@ -750,26 +781,30 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
         
         yield return new WaitForSeconds(1f); // 쿨다운
+        SafeResumeAgent();
     }
 
     public void PerformSpiritArrowRain()
     {
         if (isPhaseTransitionTriggered) return; // 페이즈 전환 중에는 실행 방지
-
-        // 쿨다운 중이거나 이미 시전 중이면 아무것도 하지 않고 반환합니다.
-        if (spiritArrowTimer > 0 || isFiringSpiritArrows) return;
+        if (isAttacking || attackTimer > 0) return; // 메인 공격 타이머 사용
+        if (isFiringSpiritArrows || isProjectileAttacking) return;
 
         if (useBehaviorTree && houndBehaviorTree != null)
         {
             houndBehaviorTree.SetAttacking(true);
         }
 
+        isAttacking = true; // 메인 공격 플래그 설정
+        isFiringSpiritArrows = true;
+        attackTimer = spiritArrowCooldown; // 메인 공격 타이머 설정
+
         StartCoroutine(SpiritArrowRainPattern());
     }
 
     IEnumerator SpiritArrowRainPattern()
     {
-        isFiringSpiritArrows = true;
+        // isFiringSpiritArrows = true; // PerformSpiritArrowRain에서 이미 설정됨
         spiritArrowTimer = spiritArrowCooldown; // 쿨다운 시작
         SafeStopAgent();
 
@@ -801,6 +836,7 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
         }
 
         isFiringSpiritArrows = false;
+        isAttacking = false; // 메인 공격 플래그 해제
 
         if (useBehaviorTree && houndBehaviorTree != null)
         {
@@ -1404,12 +1440,15 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     {
         case HoundAttackType.LeftPaw:
             animator.SetTrigger("LeftPawAttack");
+            PlaySound(leftAttackSound);
             break;
         case HoundAttackType.RightPaw:
             animator.SetTrigger("RightPawAttack");
+            PlaySound(rightAttackSound);
             break;
         case HoundAttackType.LickBite:
             animator.SetTrigger("LickBite");
+            PlaySound(tongueBiteSound);
             break;
     }
 
@@ -1676,6 +1715,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     {
         if (currentAttackType == HoundAttackType.JumpAttack)
         {
+            PlaySound(jumpAttackSound);
             SpawnJumpAreaEffect();
         }
     }
@@ -1856,9 +1896,31 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         }
     }
 
+    private void PlaySound(AudioClip clip, float volume = 0.7f)
+    {
+        if (audioSource == null)
+        {
+            Debug.LogError("AudioSource is missing!");
+            return;
+        }
+        if (clip == null)
+        {
+            Debug.LogWarning("Attempted to play a sound, but the AudioClip was null. Please assign it in the Inspector.");
+            return;
+        }
+        audioSource.PlayOneShot(clip, volume);
+    }
+
+    private IEnumerator PlaySoundWithDelay(AudioClip clip, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        PlaySound(clip);
+    }
+
     void Die()
     {
         isDead = true;
+        PlaySound(deathSound);
         // 체력바 숨기기 추가
         bossHealthBar?.HideBossHealthBar();
         animator.SetTrigger("Death");
@@ -1933,6 +1995,11 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
 
             if (floorBitePrefab != null)
             {
+                // 여우 울음소리 (경고) - 장판 생성 시
+                PlaySound(foxCrySound);
+                // 무는 소리 (실제 공격) - 데미지 딜레이 후
+                StartCoroutine(PlaySoundWithDelay(biteSound, floorBiteDamageDelay));
+
                 GameObject biteEffect = Instantiate(floorBitePrefab, targetPosition, Quaternion.identity);
                 var damageComponent = biteEffect.GetComponent<JumpAreaDamage>();
                 if (damageComponent != null)

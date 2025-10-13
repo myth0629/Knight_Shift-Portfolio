@@ -20,6 +20,7 @@ public class EnemyController : MonoBehaviour, IDamageable
     private PlayerDataManager playerData;
     private NavMeshAgent navmesh;
     private AudioSource audioSource;
+    private EnemySound enemySound;
 
 
     private void Awake()
@@ -28,6 +29,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         animator = GetComponent<Animator>();
         playerData = FindFirstObjectByType<PlayerDataManager>();
         navmesh = GetComponent<NavMeshAgent>();
+        enemySound = GetComponent<EnemySound>();
         
         // AudioSource 초기화
         audioSource = GetComponent<AudioSource>();
@@ -80,7 +82,11 @@ public class EnemyController : MonoBehaviour, IDamageable
     
     void Die()
     {
+        if (isDead) return;
         isDead = true;
+
+        enemySound?.PlayDeathSound();
+
         if (animator != null) animator.SetTrigger("Death");
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
