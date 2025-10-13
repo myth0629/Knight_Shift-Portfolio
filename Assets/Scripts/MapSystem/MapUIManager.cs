@@ -6,11 +6,11 @@ using TMPro;
 
 namespace MapSystem
 {
-    public class MapUIManager : MonoBehaviour
+    public class MapUIManager : MonoBehaviour, IUIPanel
     {
         [Header("Map UI References")]
-    [SerializeField] private RectTransform mapContainer;
-    [SerializeField] private RectTransform mapPanel; // Connections를 붙일 상위 패널 ("Map panel")
+        [SerializeField] private RectTransform mapContainer;
+        [SerializeField] private RectTransform mapPanel; // Connections를 붙일 상위 패널 ("Map panel")
         [SerializeField] private GameObject nodeUIPrefab;
         [SerializeField] private RectTransform connectionsContainer; // 연결선 전용 컨테이너 (아이콘 뒤)
         [SerializeField] private GameObject tooltipPanel;
@@ -59,6 +59,21 @@ namespace MapSystem
             
             // Initialize the map UI
             Invoke("InitializeMapUI", 0.3f);
+            
+            // UIPanelManager에 등록
+            if (UIPanelManager.Instance != null)
+            {
+                UIPanelManager.Instance.RegisterPanel(this);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            // UIPanelManager에서 등록 해제
+            if (UIPanelManager.Instance != null)
+            {
+                UIPanelManager.Instance.UnregisterPanel(this);
+            }
         }
 
         void Update()
@@ -313,9 +328,27 @@ namespace MapSystem
         {
             if(Input.GetKeyDown(KeyCode.M))
             {
-                mapContainer.gameObject.SetActive(!mapContainer.gameObject.activeSelf);
+                bool willOpen = !mapContainer.gameObject.activeSelf;
+                mapContainer.gameObject.SetActive(willOpen);
+                
+                // 맵이 열릴 때 UIPanelManager에 알림
+                if (willOpen && UIPanelManager.Instance != null)
+                {
+                    UIPanelManager.Instance.OnPanelOpened(this);
+                }
             }
-            else if(Input.GetKeyDown(KeyCode.Escape))
+            // ESC 키 처리는 UIPanelManager에서 하도록 제거
+        }
+
+        // IUIPanel 인터페이스 구현
+        public bool IsOpen()
+        {
+            return mapContainer != null && mapContainer.gameObject.activeSelf;
+        }
+
+        public void Close()
+        {
+            if (mapContainer != null)
             {
                 mapContainer.gameObject.SetActive(false);
             }
