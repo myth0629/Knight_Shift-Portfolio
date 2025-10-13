@@ -83,25 +83,41 @@ public class Portal : MonoBehaviour
             PersistentObjectManager.Instance.SetPersistentObjects();
         }
         
-        // 화면 페이드 아웃 등의 전환 효과를 여기에 추가할 수 있음
+        // 페이드 아웃 효과 시작
+        if (SceneFadeManager.Instance != null)
+        {
+            yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
+        }
         
         // 씬 로드 시작
         AsyncOperation asyncLoad = null;
         if (!string.IsNullOrEmpty(targetSceneName))
         {
             asyncLoad = SceneManager.LoadSceneAsync(targetSceneName);
+            asyncLoad.allowSceneActivation = false; // 로딩 완료 후 수동으로 활성화
             Debug.Log($"씬 '{targetSceneName}'을(를) 로드합니다.");
         }
         else if (sceneNumber >= 0)
         {
             asyncLoad = SceneManager.LoadSceneAsync(sceneNumber);
+            asyncLoad.allowSceneActivation = false;
             Debug.Log($"씬 번호 {sceneNumber}을(를) 로드합니다.");
         }
         
-        // 씬 로드가 완료될 때까지 대기
+        // 씬 로드가 90% 완료될 때까지 대기
         if (asyncLoad != null)
         {
+            while (asyncLoad.progress < 0.9f)
+            {
+                yield return null;
+            }
+            
+            // 페이드 아웃이 완전히 끝난 후 씬 활성화
+            yield return new WaitForSeconds(0.1f);
+            
             asyncLoad.allowSceneActivation = true;
+            
+            // 씬 전환 완료 대기
             while (!asyncLoad.isDone)
             {
                 yield return null;
@@ -109,6 +125,8 @@ public class Portal : MonoBehaviour
         }
         
         Debug.Log("씬 전환이 완료되었습니다.");
+        
+        // 새로운 씬에서 페이드 인 효과는 SceneFadeManager의 Start()에서 자동 실행
     }
     
     // 배틀 씬인지 확인하는 헬퍼 메서드
