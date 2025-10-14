@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Cinemachine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// UI 패널의 우선순위를 관리하는 매니저
@@ -15,6 +16,9 @@ public class UIPanelManager : MonoBehaviour
 
     [Header("기타 설정")]
     [SerializeField] private CinemachineCamera vcam;
+    public AudioSource uiSound;
+
+    PlayerInput input;
 
     // 등록된 UI 패널들 (옵션 패널 제외)
     private List<IUIPanel> registeredPanels = new List<IUIPanel>();
@@ -38,6 +42,8 @@ public class UIPanelManager : MonoBehaviour
         {
             vcam = FindFirstObjectByType<CinemachineCamera>();
         }
+        input = FindFirstObjectByType<PlayerInput>();
+        uiSound = GetComponent<AudioSource>();
     }
 
     private void Update()
@@ -100,7 +106,9 @@ public class UIPanelManager : MonoBehaviour
             Time.timeScale = 0f;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            if (vcam != null) vcam.gameObject.SetActive(false);
+            vcam.gameObject.SetActive(false);
+            input.enabled = false;
+            uiSound.PlayOneShot(uiSound.clip);
         }
         else
         {
@@ -108,7 +116,8 @@ public class UIPanelManager : MonoBehaviour
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
-            if (vcam != null) vcam.gameObject.SetActive(true);
+            vcam.gameObject.SetActive(true);
+            input.enabled = true;
         }
     }
 

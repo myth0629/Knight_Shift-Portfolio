@@ -97,6 +97,7 @@ public class SceneFadeManager : MonoBehaviour
 
         isFading = true;
         fadePanel.gameObject.SetActive(true);
+        fadePanel.raycastTarget = true; // 페이드아웃 시작 시 레이캐스트 차단 활성화
 
         float elapsedTime = 0f;
         Color startColor = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 0f);
@@ -127,6 +128,10 @@ public class SceneFadeManager : MonoBehaviour
 
         isFading = true;
         fadePanel.gameObject.SetActive(true);
+        fadePanel.raycastTarget = true; // 페이드인 시작 시 레이캐스트 차단 활성화
+
+        // 페이드인 시작 전 1초 대기 (검은 화면 유지)
+        yield return new WaitForSeconds(0.5f);
 
         float elapsedTime = 0f;
         Color startColor = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 1f);
@@ -141,6 +146,7 @@ public class SceneFadeManager : MonoBehaviour
         }
 
         fadePanel.color = endColor;
+        fadePanel.raycastTarget = false; // 페이드인 완료 후 레이캐스트 차단 해제
         isFading = false;
     }
 

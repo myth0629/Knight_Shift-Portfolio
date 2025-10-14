@@ -10,6 +10,7 @@ public class SimpleUIPanel : MonoBehaviour, IUIPanel
     [SerializeField] private GameObject panelObject;
     [SerializeField] private bool manageCursor = true;
     [SerializeField] private bool pauseGame = false;
+    [SerializeField] private GameObject parentPanel; // 부모 패널 (옵션 창 등)
     
     private CinemachineCamera vcam;
 
@@ -39,6 +40,12 @@ public class SimpleUIPanel : MonoBehaviour, IUIPanel
     public void Open()
     {
         if (panelObject == null) return;
+
+        // 부모 패널이 있으면 숨기기 (나중에 복원하기 위해)
+        if (parentPanel != null && parentPanel.activeSelf)
+        {
+            parentPanel.SetActive(false);
+        }
 
         panelObject.SetActive(true);
 
@@ -74,20 +81,29 @@ public class SimpleUIPanel : MonoBehaviour, IUIPanel
 
         panelObject.SetActive(false);
 
-        if (manageCursor)
+        // 부모 패널이 있으면 다시 활성화
+        if (parentPanel != null)
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            parentPanel.SetActive(true);
         }
-
-        if (pauseGame)
+        else
         {
-            Time.timeScale = 1f;
-        }
+            // 부모 패널이 없는 경우에만 커서/시간/카메라 복원
+            if (manageCursor)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
 
-        if (vcam != null)
-        {
-            vcam.gameObject.SetActive(true);
+            if (pauseGame)
+            {
+                Time.timeScale = 1f;
+            }
+
+            if (vcam != null)
+            {
+                vcam.gameObject.SetActive(true);
+            }
         }
     }
 
@@ -118,5 +134,13 @@ public class SimpleUIPanel : MonoBehaviour, IUIPanel
     public void SetPanelObject(GameObject panel)
     {
         panelObject = panel;
+    }
+
+    /// <summary>
+    /// 부모 패널을 코드에서 설정
+    /// </summary>
+    public void SetParentPanel(GameObject parent)
+    {
+        parentPanel = parent;
     }
 }

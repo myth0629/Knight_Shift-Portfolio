@@ -67,9 +67,6 @@ public class UIManager : MonoBehaviour
             // 게임 일시정지 (필요 시)
             Time.timeScale = 0f;
             
-            // 카메라 시점 이동 금지
-            vcam.gameObject.SetActive(false);
-            
             // UIPanelManager에 패널이 열렸음을 알림
             if (slotPanelWrapper != null)
             {
@@ -100,9 +97,9 @@ public class UIManager : MonoBehaviour
             // 마우스 커서 보이게 & 잠금 해제
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            
+
             input.enabled = false;
-            
+
             // 카메라 시점 이동 금지
             vcam.gameObject.SetActive(false);
             

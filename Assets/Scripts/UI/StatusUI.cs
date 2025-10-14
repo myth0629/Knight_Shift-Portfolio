@@ -18,21 +18,23 @@ public class StatusUI : MonoBehaviour, IUIPanel
     private PlayerStatus playerStatus;
     private WeaponManager weaponManager;
     private WeaponUpgradeSystem upgradeSystem;
-    
+
     // 임시 레벨 시스템 (현재 레벨 시스템이 없으므로)
     [Header("임시 레벨 설정")]
     public int playerLevel = 1;
+    private AudioSource uiSound;
     
     void Start()
     {
         // 컴포넌트 참조 가져오기
         playerStatus = FindFirstObjectByType<PlayerStatus>();
-        
+
         // UIPanelManager에 등록
         if (UIPanelManager.Instance != null)
         {
             UIPanelManager.Instance.RegisterPanel(this);
         }
+        uiSound = FindFirstObjectByType<UIManager>().GetComponent<AudioSource>();
     }
 
     private void OnDestroy()
@@ -94,6 +96,8 @@ public class StatusUI : MonoBehaviour, IUIPanel
                 // 마우스 커서 보이게 & 잠금 해제
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                
+                uiSound.PlayOneShot(uiSound.clip);
                 
                 // UIPanelManager에 패널이 열렸음을 알림
                 if (UIPanelManager.Instance != null)
