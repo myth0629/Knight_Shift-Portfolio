@@ -6,7 +6,7 @@ namespace EnemyAI
     [RequireComponent(typeof(NavMeshAgent), typeof(Animator))]
     public class EnemyBehaviorTree : MonoBehaviour
     {
-        [Header("Ranges")] public float SightRange = 12f; public float SightAngle = 120f; public float HearRange = 6f; public float AttackRange = 2.2f; public float ChaseLeashRange = 25f; public float SearchRadius = 5f; public float SearchDuration = 5f; public float AlertDuration = 1.5f;
+        [Header("Ranges")] public float SightRange = 12f; public float SightAngle = 120f; public float HearRange = 6f; public float AttackRange = 2.2f; public float ProximityRange = 3f; public float ChaseLeashRange = 25f; public float SearchRadius = 5f; public float SearchDuration = 5f; public float AlertDuration = 1.5f;
                 [Header("Patrol")] public bool UsePatrol = false; public Vector3[] PatrolPoints; public float PatrolWait = 1f; public float PatrolArriveThreshold = 0.25f;
         [Header("Dynamic Patrol")] public bool GenerateDynamicPatrol = true; public int DynamicPatrolPointsCount = 3; public float DynamicPatrolRadius = 7f;
         [Header("Speeds")] public float PatrolSpeed = 2f; public float ChaseSpeed = 3f;
@@ -126,7 +126,8 @@ namespace EnemyAI
             if (distance <= SightRange)
             {
                 float angle = Vector3.Angle(transform.forward, toPlayer.normalized);
-                bool ignoreAngle = bb.InAttackRange; // 전투(공격 사거리 내)일 때는 시야각 무시
+                // Player is in attack range OR in proximity range -> ignore angle
+                bool ignoreAngle = bb.InAttackRange || distance <= ProximityRange;
                 if ((ignoreAngle || angle <= SightAngle * 0.5f) && HasLineOfSight())
                 {
                     bb.CanSeePlayer = true;
@@ -216,17 +217,23 @@ namespace EnemyAI
             {
                 if (ctx.UsePatrol && ctx.PatrolPoints != null && ctx.PatrolPoints.Length > 0)
                 {
+                    if (!initialized)
+                    {
+                        Debug.Log($"[{ctx.gameObject.name}] Starting patrol. Points: {ctx.PatrolPoints.Length}. Speed: {ctx.PatrolSpeed}");
+                    }
+
                     ctx.agent.isStopped = false;
                     if (ctx.agent.speed != ctx.PatrolSpeed) ctx.agent.speed = ctx.PatrolSpeed;
 
                     if (nextSetDestCooldown > 0f) nextSetDestCooldown -= Time.deltaTime;
 
-                    // 초기 목적지 설정 혹은 경로 잃은 경우
-                    if ((!initialized || !ctx.agent.hasPath || ctx.agent.destination == ctx.transform.position) && nextSetDestCooldown <= 0f)
+                    if ((!initialized || !ctx.agent.hasPath || ctx.agent.pathStatus == NavMeshPathStatus.PathInvalid) && nextSetDestCooldown <= 0f)
                     {
                         initialized = true;
-                        ctx.agent.SetDestination(ctx.PatrolPoints[ctx.patrolIndex]);
-                        nextSetDestCooldown = 0.1f; // 과도한 재설정 방지
+                        Vector3 dest = ctx.PatrolPoints[ctx.patrolIndex];
+                        ctx.agent.SetDestination(dest);
+                        nextSetDestCooldown = 0.1f;
+                        Debug.Log($"[{ctx.gameObject.name}] Setting destination to {dest}. Path pending: {ctx.agent.pathPending}, Has path: {ctx.agent.hasPath}, Path status: {ctx.agent.pathStatus}");
                     }
 
                     if (ctx.agent.pathPending)
@@ -234,23 +241,28 @@ namespace EnemyAI
                         return NodeState.Running; // 경로 계산 중
                     }
 
-                    // 실제 목적지까지의 평면 거리 (remainingDistance가 순간 0 되는 플리커 방지)
-                    Vector3 dest = ctx.PatrolPoints[ctx.patrolIndex];
-                    float planarDist = Vector3.Distance(new Vector3(dest.x, 0f, dest.z), new Vector3(ctx.transform.position.x, 0f, ctx.transform.position.z));
-                    float speed = new Vector3(ctx.agent.velocity.x, 0f, ctx.agent.velocity.z).magnitude;
+                    Vector3 planarDest = ctx.PatrolPoints[ctx.patrolIndex];
+                    planarDest.y = ctx.transform.position.y;
+                    float planarDist = Vector3.Distance(ctx.transform.position, planarDest);
 
-                    bool arrived = planarDist <= Mathf.Max(ctx.PatrolArriveThreshold, ctx.agent.stoppingDistance + 0.01f) && speed < 0.1f;
-                    if (arrived)
+                    if (planarDist <= ctx.agent.stoppingDistance + 0.1f)
                     {
                         ctx.patrolWaitTimer += Time.deltaTime;
                         if (ctx.patrolWaitTimer >= ctx.PatrolWait)
                         {
                             ctx.patrolIndex = (ctx.patrolIndex + 1) % ctx.PatrolPoints.Length;
-                            ctx.agent.SetDestination(ctx.PatrolPoints[ctx.patrolIndex]);
                             ctx.patrolWaitTimer = 0f;
-                            nextSetDestCooldown = 0.1f;
+                            // Force destination update in the next frame
+                            nextSetDestCooldown = 0f;
+                            initialized = false; 
                         }
                     }
+                }
+                else
+                {
+                    ctx.agent.isStopped = true;
+                    if (ctx.agent.hasPath) ctx.agent.ResetPath();
+                    Debug.LogWarning($"[{ctx.gameObject.name}] IDLE. No patrol points or UsePatrol is false.");
                 }
                 return NodeState.Running;
             }
