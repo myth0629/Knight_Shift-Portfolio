@@ -52,6 +52,14 @@ public class PlayerDataManager : MonoBehaviour
             return false;
 
         Gold -= amount;
+        Debug.Log($"{amount} gold spent. Remaining gold: {Gold}");
+        
+        // UI 즉시 업데이트
+        if (playerUI != null)
+        {
+            playerUI.UpdateGold();
+        }
+        
         // db에서 금액 업데이트
         goldManager.SaveGold(Gold);
         return true;

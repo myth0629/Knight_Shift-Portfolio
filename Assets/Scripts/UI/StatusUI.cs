@@ -34,7 +34,7 @@ public class StatusUI : MonoBehaviour, IUIPanel
         {
             UIPanelManager.Instance.RegisterPanel(this);
         }
-        uiSound = FindFirstObjectByType<UIManager>().GetComponent<AudioSource>();
+        uiSound = FindFirstObjectByType<WeaponManager>().GetComponent<AudioSource>();
     }
 
     private void OnDestroy()
@@ -91,12 +91,15 @@ public class StatusUI : MonoBehaviour, IUIPanel
             
             if (isActive)
             {
+                // 패널을 열 때마다 PlayerStatus 참조 확인
+                if (playerStatus == null)
+                {
+                    playerStatus = FindFirstObjectByType<PlayerStatus>();
+                    Debug.Log("패널 열기: PlayerStatus 참조 갱신");
+                }
+                
                 UpdateStatusDisplay();
-                
-                // 마우스 커서 보이게 & 잠금 해제
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                
+            
                 uiSound.PlayOneShot(uiSound.clip);
                 
                 // UIPanelManager에 패널이 열렸음을 알림
@@ -104,12 +107,6 @@ public class StatusUI : MonoBehaviour, IUIPanel
                 {
                     UIPanelManager.Instance.OnPanelOpened(this);
                 }
-            }
-            else
-            {
-                // 마우스 커서 숨기고 잠금
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
             }
         }
     }
@@ -134,6 +131,13 @@ public class StatusUI : MonoBehaviour, IUIPanel
     
     public void UpdateStatusDisplay()
     {
+        // PlayerStatus가 없으면 다시 찾기 시도
+        if (playerStatus == null)
+        {
+            playerStatus = FindFirstObjectByType<PlayerStatus>();
+            Debug.Log("PlayerStatus 늦은 초기화 시도");
+        }
+        
         // 레벨 표시
         if (levelText != null)
         {
@@ -144,12 +148,24 @@ public class StatusUI : MonoBehaviour, IUIPanel
         if (hpText != null && playerStatus != null)
         {
             hpText.text = $"HP : {Mathf.RoundToInt(playerStatus.currentHp)}/{playerStatus.maxHp}";
+            Debug.Log($"HP 업데이트: {playerStatus.currentHp}/{playerStatus.maxHp}");
+        }
+        else if (hpText != null && playerStatus == null)
+        {
+            Debug.LogWarning("PlayerStatus를 찾을 수 없습니다!");
+            hpText.text = "HP : 0/0";
         }
         
         // SP 표시
         if (spText != null && playerStatus != null)
         {
             spText.text = $"SP : {Mathf.RoundToInt(playerStatus.currentSp)}/{playerStatus.maxSp}";
+            Debug.Log($"SP 업데이트: {playerStatus.currentSp}/{playerStatus.maxSp}");
+        }
+        else if (spText != null && playerStatus == null)
+        {
+            Debug.LogWarning("PlayerStatus를 찾을 수 없습니다!");
+            spText.text = "SP : 0/0";
         }
         
         // 무기 정보 표시
@@ -252,16 +268,6 @@ public class StatusUI : MonoBehaviour, IUIPanel
             
             // 게임 재시작
             Time.timeScale = 1f;
-        }
-    }
-    
-    // 레벨업 함수 (추후 레벨 시스템 구현 시 사용)
-    public void LevelUp()
-    {
-        playerLevel++;
-        if (statusPanel.activeSelf)
-        {
-            UpdateStatusDisplay();
         }
     }
     

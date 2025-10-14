@@ -227,6 +227,12 @@ public class StatUpgradeShop : MonoBehaviour
         {
             goldText.text = $"골드 : {PlayerGold}";
         }
+        
+        // PlayerUI의 골드도 업데이트
+        if (playerUI != null)
+        {
+            playerUI.UpdateGold();
+        }
     }
 
     private void ShowFeedback(string message)
