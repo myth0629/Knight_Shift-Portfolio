@@ -32,6 +32,31 @@ public class Weapon : MonoBehaviour
         this.damage = damage;
     }
 
+    /// <summary>
+    /// 강화 레벨을 고려한 실제 데미지 계산
+    /// </summary>
+    public float GetActualDamage()
+    {
+        if (weaponData == null)
+        {
+            return damage;
+        }
+
+        // WeaponUpgradeSystem에서 현재 강화 레벨 가져오기
+        int upgradeLevel = 0;
+        if (WeaponUpgradeSystem.Instance != null)
+        {
+            upgradeLevel = WeaponUpgradeSystem.Instance.GetLevel(weaponData);
+        }
+
+        // 기본 데미지 + 강화 레벨당 20% 증가
+        float baseDamage = weaponData.damage;
+        float upgradeMultiplier = 1f + (upgradeLevel * 0.2f);
+        float finalDamage = baseDamage * upgradeMultiplier;
+
+        return finalDamage;
+    }
+
     // 애니메이션 이벤트
     public void EnableDamageCollider()
     {
@@ -69,8 +94,18 @@ public class Weapon : MonoBehaviour
                 Vector3 hitPoint = other.ClosestPoint(damageCollider.transform.position);
                 Vector3 hitNormal = (damageCollider.transform.position - hitPoint).normalized;
                 
+                // 강화 레벨이 반영된 실제 데미지 계산
+                float actualDamage = GetActualDamage();
+                
                 // 충돌 위치 정보와 함께 데미지 전달
-                damageable.TakeDamage(damage, hitPoint, hitNormal);
+                damageable.TakeDamage(actualDamage, hitPoint, hitNormal);
+                
+                // 디버그 로그 (강화 반영 확인용)
+                if (WeaponUpgradeSystem.Instance != null && weaponData != null)
+                {
+                    int level = WeaponUpgradeSystem.Instance.GetLevel(weaponData);
+                    Debug.Log($"[Weapon] {weaponData.weaponName} +{level} 공격! 기본 데미지: {weaponData.damage}, 실제 데미지: {actualDamage}");
+                }
             }
         }
     }

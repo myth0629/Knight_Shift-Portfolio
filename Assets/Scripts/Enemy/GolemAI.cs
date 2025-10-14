@@ -818,6 +818,9 @@ public class GolemAI : MonoBehaviour, IDamageable
             hook.stageManager = StageManager.Instance;
         }
         hook?.OnBossDied();
+
+        // 보스 스테이지 매니저에 보스 사망 알림
+        BossStageManager.Instance?.OnBossDeath();
     }
 
     void OnDrawGizmosSelected()

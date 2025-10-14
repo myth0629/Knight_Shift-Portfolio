@@ -624,7 +624,11 @@ IEnumerator MaintainAuraEffect(GameObject auraEffect)
             audioSource.spatialBlend = 1f; // 3D 사운드
             audioSource.rolloffMode = AudioRolloffMode.Linear;
             audioSource.maxDistance = 40f;
+            audioSource.volume = 0.5f;
         }
+        
+        // 피격 판정 초기 상태 확인
+        Debug.Log($"[하운드 초기화] HP: {currentHp}/{maxHp}, 무적: {isInvincible}, 콜라이더 활성: {(mainCollider != null ? mainCollider.enabled : false)}");
     }
 
     void FindPlayer()
@@ -1856,10 +1860,21 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
 
     public void TakeDamage(float damageAmount)
     {
-        if (isDead || isInvincible) return;
+        if (isDead)
+        {
+            Debug.Log("[하운드] 이미 사망 상태 - 데미지 무시");
+            return;
+        }
+        
+        if (isInvincible)
+        {
+            Debug.Log("[하운드] 무적 상태! 데미지 무시");
+            return;
+        }
 
         if (Time.time - lastDamageTime < damageImmunityTime)
         {
+            Debug.Log($"[하운드] 데미지 면역 시간 중 (남은 시간: {damageImmunityTime - (Time.time - lastDamageTime):F2}초)");
             return;
         }
 
@@ -1876,7 +1891,8 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         }
         
         bossHealthBar?.UpdateHealth(currentHp);
-        Debug.Log($"하운드가 {damageAmount} 데미지를 받았습니다. 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")})");
+        Debug.Log($"[하운드 피격] {damageAmount} 데미지! 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")}, 무적: {isInvincible})");
+        
         if (!isPhase2 && !isPhaseTransitionTriggered &&
         currentHp <= maxHp * phase2HealthThreshold)
         {
@@ -1895,10 +1911,21 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
     /// </summary>
     public void TakeDamage(float damageAmount, Vector3 hitPoint, Vector3 hitNormal)
     {
-        if (isDead || isInvincible) return;
+        if (isDead)
+        {
+            Debug.Log("[하운드] 이미 사망 상태 - 데미지 무시");
+            return;
+        }
+        
+        if (isInvincible)
+        {
+            Debug.Log("[하운드] 무적 상태! 데미지 무시");
+            return;
+        }
 
         if (Time.time - lastDamageTime < damageImmunityTime)
         {
+            Debug.Log($"[하운드] 데미지 면역 시간 중 (남은 시간: {damageImmunityTime - (Time.time - lastDamageTime):F2}초)");
             return;
         }
 
@@ -1915,7 +1942,8 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         }
         
         bossHealthBar?.UpdateHealth(currentHp);
-        Debug.Log($"하운드가 {damageAmount} 데미지를 받았습니다 (위치: {hitPoint}). 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")})");
+        Debug.Log($"[하운드 피격] {damageAmount} 데미지 (위치: {hitPoint})! 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")}, 무적: {isInvincible})");
+        
         if (!isPhase2 && !isPhaseTransitionTriggered &&
         currentHp <= maxHp * phase2HealthThreshold)
         {
@@ -1977,7 +2005,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
             animator.SetLayerWeight(upperBodyLayerIndex, 0f);
         }
 
-        Destroy(gameObject, 3f);
+        Destroy(gameObject, 4f);
         playerData.AddGold(dropGold);
 
         // 스테이지 매니저에 보스 처치 알림
@@ -1988,6 +2016,9 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
             hook.stageManager = StageManager.Instance;
         }
         hook?.OnBossDied();
+
+        // 보스 스테이지 매니저에 보스 사망 알림
+        BossStageManager.Instance?.OnBossDeath();
     }
     void TriggerPhaseTransition()
     {
@@ -2020,14 +2051,17 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         bool originalRootMotion = animator.applyRootMotion;
         animator.applyRootMotion = false; // 애니메이션의 루트 모션으로 인한 움직임을 방지합니다.
         animator.SetTrigger("Roar"); // 포효 애니메이션으로 전환 시작을 알림
+        
         isInvincible = true;
+        Debug.Log($"=== 페이즈 전환: 무적 활성화! (isInvincible = {isInvincible}) ===");
+        
         if (houndShieldPrefab != null)
         {
             // 쉴드를 하운드의 자식으로 생성하고, 제공해주신 정확한 로컬 좌표로 위치를 설정합니다.
             houndShield = Instantiate(houndShieldPrefab, transform);
             houndShield.transform.localPosition = new Vector3(0f, 0.5887311f, -3.59f);
             houndShield.transform.localRotation = Quaternion.identity; // 회전값도 초기화합니다.
-            Debug.Log("페이즈 전환: 쉴드 생성 및 무적 상태 돌입");
+            Debug.Log("페이즈 전환: 쉴드 오브젝트 생성 완료");
         }
 
         // 2. 바닥 물기 패턴 3회 실행
@@ -2057,9 +2091,14 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         }
 
         // 3. 쉴드 제거 및 무적 해제, 2페이즈 활성화
-        if (houndShield != null) Destroy(houndShield);
+        if (houndShield != null)
+        {
+            Destroy(houndShield);
+            Debug.Log("페이즈 전환: 쉴드 오브젝트 제거됨");
+        }
+        
         isInvincible = false;
-        Debug.Log("페이즈 전환: 쉴드 제거 및 무적 해제");
+        Debug.Log($"=== 페이즈 전환: 무적 해제! (isInvincible = {isInvincible}) ===");
 
         // NavMeshAgent의 제어는 Behavior Tree가 다시 시작하므로, 여기서는 별도로 활성화할 필요가 없습니다.
         animator.applyRootMotion = originalRootMotion; // 원래 루트 모션 상태로 복원합니다.

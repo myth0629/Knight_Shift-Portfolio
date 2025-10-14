@@ -1,3 +1,4 @@
+using EnemyAI;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -21,6 +22,7 @@ public class EnemyController : MonoBehaviour, IDamageable
     private NavMeshAgent navmesh;
     private AudioSource audioSource;
     private EnemySound enemySound;
+    private EnemyBehaviorTree enemyBT;
 
 
     private void Awake()
@@ -30,6 +32,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         playerData = FindFirstObjectByType<PlayerDataManager>();
         navmesh = GetComponent<NavMeshAgent>();
         enemySound = GetComponent<EnemySound>();
+        enemyBT = GetComponent<EnemyBehaviorTree>();
         
         // AudioSource 초기화
         audioSource = GetComponent<AudioSource>();
@@ -122,6 +125,8 @@ public class EnemyController : MonoBehaviour, IDamageable
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
 
+        enemyBT.enabled = false;
+        navmesh.isStopped = true;
         navmesh.enabled = false;
         
         // 골드 지급: 플레이어 데이터 시스템이 존재할 때만

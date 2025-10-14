@@ -648,5 +648,32 @@ namespace MapSystem
         {
             return new List<MapNode>(mapNodes);
         }
+        
+        /// <summary>
+        /// 맵을 완전히 초기화하고 새로 생성 (보스 처치 후 새 스테이지 시작 시 사용)
+        /// </summary>
+        public void ResetAndRegenerateMap()
+        {
+            Debug.Log("[MapController] 맵 초기화 및 재생성 시작...");
+            
+            // 기존 맵 데이터 초기화
+            mapNodes.Clear();
+            nextNodeId = 0;
+            currentNode = null;
+            
+            // 새 맵 생성
+            GenerateMap();
+            
+            // 시작 노드 선택
+            MapNode startNode = mapNodes.Find(node => node.nodeType == NodeType.Start);
+            if (startNode != null)
+            {
+                SelectNode(startNode.id);
+                Debug.Log("[MapController] 새 맵 생성 완료! 시작 노드로 초기화됨");
+            }
+            
+            // 포탈 재생성 이벤트 발생 (PortalGenerator가 OnNodeSelected 이벤트를 구독 중)
+            OnNodeSelected?.Invoke(currentNode);
+        }
     }
 }

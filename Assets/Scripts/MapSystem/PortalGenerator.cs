@@ -70,6 +70,15 @@ public class PortalGenerator : MonoBehaviour
         Invoke("GeneratePortals", 1f);
     }
     
+    private void OnDestroy()
+    {
+        // 이벤트 구독 해제
+        if (mapController != null)
+        {
+            mapController.OnNodeSelected -= OnNodeSelected;
+        }
+    }
+    
     private void HandleNodeSelected(MapNode node)
     {
         // 포탈 전부 삭제
