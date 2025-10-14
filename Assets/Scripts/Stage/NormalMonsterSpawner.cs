@@ -22,7 +22,7 @@ public class NormalMonsterSpawner : MonoBehaviour
     public float spawnSpreadRadius = 3.0f;
 
     [Tooltip("땅을 찾은 지점에서 NavMesh를 검색할 최대 반경 (보통 작은 값)")]
-    public float navMeshFindRadius = 1.0f;
+    public float navMeshFindRadius = 5.5f;
 
     void Start()
     {
