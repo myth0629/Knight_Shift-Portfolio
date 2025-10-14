@@ -60,6 +60,37 @@ public class EnemyController : MonoBehaviour, IDamageable
         // 피격 사운드 재생
         PlayHitSound();
         
+        // 기본 위치에 히트 이펙트 생성
+        if (HitEffectManager.Instance != null)
+        {
+            HitEffectManager.Instance.PlayHitEffect(transform.position + Vector3.up, 0); // 기본 이펙트
+        }
+        
+        if (!isDead && animator != null) animator.SetTrigger("Hit");
+        if (currentHp <= 0)
+        {
+            currentHp = 0;
+            Die();
+        }
+    }
+    
+    /// <summary>
+    /// 충돌 위치 정보와 함께 데미지를 받습니다
+    /// </summary>
+    public void TakeDamage(float damageAmount, Vector3 hitPoint, Vector3 hitNormal)
+    {
+        Debug.Log($"Skeleton Damage Taken: {damageAmount} at {hitPoint}");
+        currentHp -= damageAmount;
+        
+        // 피격 사운드 재생
+        PlayHitSound();
+        
+        // 충돌 위치에 히트 이펙트 생성
+        if (HitEffectManager.Instance != null)
+        {
+            HitEffectManager.Instance.PlayHitEffect(hitPoint, hitNormal, 0); // 기본 이펙트
+        }
+        
         if (!isDead && animator != null) animator.SetTrigger("Hit");
         if (currentHp <= 0)
         {

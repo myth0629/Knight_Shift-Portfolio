@@ -64,7 +64,13 @@ public class Weapon : MonoBehaviour
             if (damageable != null)
             {
                 targetsHitDuringSwing.Add(other); // 히트 목록에 추가
-                damageable.TakeDamage(damage);
+                
+                // 충돌 위치 계산 (무기 위치에서 타겟으로의 가장 가까운 지점)
+                Vector3 hitPoint = other.ClosestPoint(damageCollider.transform.position);
+                Vector3 hitNormal = (damageCollider.transform.position - hitPoint).normalized;
+                
+                // 충돌 위치 정보와 함께 데미지 전달
+                damageable.TakeDamage(damage, hitPoint, hitNormal);
             }
         }
     }

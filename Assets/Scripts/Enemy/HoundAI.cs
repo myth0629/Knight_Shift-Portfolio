@@ -1869,8 +1869,53 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         // 피격 사운드 재생
         PlayHitSound();
         
+        // 기본 위치에 히트 이펙트 생성
+        if (HitEffectManager.Instance != null)
+        {
+            HitEffectManager.Instance.PlayHitEffect(transform.position + Vector3.up * 2f, 0);
+        }
+        
         bossHealthBar?.UpdateHealth(currentHp);
         Debug.Log($"하운드가 {damageAmount} 데미지를 받았습니다. 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")})");
+        if (!isPhase2 && !isPhaseTransitionTriggered &&
+        currentHp <= maxHp * phase2HealthThreshold)
+        {
+            TriggerPhaseTransition();
+            return;
+        }
+
+        if (currentHp <= 0)
+        {
+            Die();
+        }
+    }
+    
+    /// <summary>
+    /// 충돌 위치 정보와 함께 데미지를 받습니다
+    /// </summary>
+    public void TakeDamage(float damageAmount, Vector3 hitPoint, Vector3 hitNormal)
+    {
+        if (isDead || isInvincible) return;
+
+        if (Time.time - lastDamageTime < damageImmunityTime)
+        {
+            return;
+        }
+
+        lastDamageTime = Time.time;
+        currentHp -= damageAmount;
+        
+        // 피격 사운드 재생
+        PlayHitSound();
+        
+        // 충돌 위치에 히트 이펙트 생성
+        if (HitEffectManager.Instance != null)
+        {
+            HitEffectManager.Instance.PlayHitEffect(hitPoint, hitNormal, 0);
+        }
+        
+        bossHealthBar?.UpdateHealth(currentHp);
+        Debug.Log($"하운드가 {damageAmount} 데미지를 받았습니다 (위치: {hitPoint}). 현재 HP: {currentHp}/{maxHp} (페이즈: {(isPhase2 ? "2" : "1")})");
         if (!isPhase2 && !isPhaseTransitionTriggered &&
         currentHp <= maxHp * phase2HealthThreshold)
         {

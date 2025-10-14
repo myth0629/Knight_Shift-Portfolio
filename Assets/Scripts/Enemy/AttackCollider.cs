@@ -27,9 +27,14 @@ public class AttackCollider : MonoBehaviour
                 IDamageable damageable = other.GetComponent<IDamageable>();
                 if (damageable != null)
                 {
-                    damageable.TakeDamage(damageAmount);
+                    // 충돌 위치 계산
+                    Vector3 hitPoint = other.ClosestPoint(transform.position);
+                    Vector3 hitNormal = (transform.position - hitPoint).normalized;
+                    
+                    // 충돌 위치 정보와 함께 데미지 전달
+                    damageable.TakeDamage(damageAmount, hitPoint, hitNormal);
                     hasDealtDamage = true;
-                    Debug.Log($"플레이어에게 {damageAmount} 데미지!");
+                    Debug.Log($"플레이어에게 {damageAmount} 데미지! (위치: {hitPoint})");
                     
                     // 0.5초 후 다시 데미지 가능하도록 (연속 공격 방지)
                     Invoke(nameof(ResetDamage), 0.5f);
