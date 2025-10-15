@@ -96,9 +96,50 @@ public class LockOnSystem : MonoBehaviour
                 Unlock();
         }
 
+        // 타겟이 비활성화되면 자동 언락
         if (CurrentTarget != null && !CurrentTarget.gameObject.activeInHierarchy)
         {
             Unlock();
+        }
+
+        // 타겟이 죽었는지 확인하여 자동 언락
+        if (CurrentTarget != null)
+        {
+            // 적의 Health 컴포넌트를 찾아서 사망 상태 확인
+            var healthComponents = CurrentTarget.GetComponents<MonoBehaviour>();
+            foreach (var component in healthComponents)
+            {
+                if (component == null) continue;
+                
+                var type = component.GetType();
+                // EnemyHealth, BossHealth 등 다양한 체력 컴포넌트 지원
+                if (type.Name.Contains("Health"))
+                {
+                    // IsDead 속성 확인
+                    var isDeadProperty = type.GetProperty("IsDead");
+                    if (isDeadProperty != null)
+                    {
+                        object value = isDeadProperty.GetValue(component);
+                        if (value is bool isDead && isDead)
+                        {
+                            Unlock();
+                            break;
+                        }
+                    }
+                    
+                    // 혹은 CurrentHealth 확인 (0 이하면 사망으로 간주)
+                    var currentHealthProperty = type.GetProperty("CurrentHealth");
+                    if (currentHealthProperty != null)
+                    {
+                        object value = currentHealthProperty.GetValue(component);
+                        if ((value is float health && health <= 0) || (value is int healthInt && healthInt <= 0))
+                        {
+                            Unlock();
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         // 락온 거리를 벗어나면 자동 언록

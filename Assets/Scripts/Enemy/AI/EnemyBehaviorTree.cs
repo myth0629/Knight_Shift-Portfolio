@@ -307,7 +307,7 @@ namespace EnemyAI
 
         private class CombatNode : BTNode
         {
-            private EnemyBehaviorTree ctx; private float attackCooldown = 0f; private float attackInterval = 2f;
+            private EnemyBehaviorTree ctx; private float attackCooldown = 1f; private float attackInterval = 1.5f;
             public CombatNode(EnemyBlackboard bb, EnemyBehaviorTree c) : base(bb) { ctx = c; }
             public override NodeState Evaluate()
             {

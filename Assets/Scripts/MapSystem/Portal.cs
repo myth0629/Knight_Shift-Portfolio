@@ -14,6 +14,9 @@ public class Portal : MonoBehaviour
     // 동적으로 설정된 씬 이름 (런타임에 SetSceneName으로 설정)
     private string runtimeSceneName = null;
     
+    // 씬 전환 중복 방지 플래그
+    private bool isTransitioning = false;
+    
     // 포털 클릭 이벤트를 위한 델리게이트
     public delegate void PortalClickedHandler(int nodeId);
     public static event PortalClickedHandler OnPortalClicked;
@@ -42,11 +45,29 @@ public class Portal : MonoBehaviour
         // 플레이어가 포탈 트리거에 진입했을 때
         if (other.CompareTag("Player"))
         {
+            // 이미 씬 전환 중이면 무시
+            if (isTransitioning)
+            {
+                Debug.Log("[Portal] 이미 씬 전환 중입니다. 중복 실행 방지.");
+                return;
+            }
+
             Debug.Log("Player entered the portal");
 
             // 노드 ID가 유효할 때만 실행
             if (nodeId >= 0)
             {
+                // 씬 전환 플래그 설정
+                isTransitioning = true;
+                
+                // 포탈 Collider 비활성화하여 중복 트리거 완전 방지
+                Collider portalCollider = GetComponent<Collider>();
+                if (portalCollider != null)
+                {
+                    portalCollider.enabled = false;
+                    Debug.Log("[Portal] Collider 비활성화 - 중복 트리거 방지");
+                }
+                
                 // 씬 전환 코루틴 시작
                 StartCoroutine(TransitionToScene());
             }
@@ -56,6 +77,8 @@ public class Portal : MonoBehaviour
     // 씬 전환을 위한 코루틴
     private IEnumerator TransitionToScene()
     {
+        Debug.Log("[Portal] 씬 전환 시작");
+        
         string targetSceneName = GetSceneName();
         
         // 배틀 씬인 경우 실시간으로 다음 배틀 씬 결정
@@ -86,13 +109,20 @@ public class Portal : MonoBehaviour
         // 페이드 아웃 효과 시작
         if (SceneFadeManager.Instance != null)
         {
+            Debug.Log("[Portal] 페이드 아웃 시작");
             yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
+            Debug.Log("[Portal] 페이드 아웃 완료");
+        }
+        else
+        {
+            Debug.LogWarning("[Portal] SceneFadeManager를 찾을 수 없습니다!");
         }
         
         // 씬 로드 시작
         AsyncOperation asyncLoad = null;
         if (!string.IsNullOrEmpty(targetSceneName))
         {
+            Debug.Log($"[Portal] 씬 '{targetSceneName}' 비동기 로딩 시작");
             asyncLoad = SceneManager.LoadSceneAsync(targetSceneName);
             asyncLoad.allowSceneActivation = false; // 로딩 완료 후 수동으로 활성화
             Debug.Log($"씬 '{targetSceneName}'을(를) 로드합니다.");
@@ -109,24 +139,37 @@ public class Portal : MonoBehaviour
         {
             while (asyncLoad.progress < 0.9f)
             {
+                Debug.Log($"[Portal] 로딩 진행률: {asyncLoad.progress * 100}%");
                 yield return null;
             }
+            
+            Debug.Log("[Portal] 씬 로딩 90% 완료, 활성화 준비 중...");
             
             // 페이드 아웃이 완전히 끝난 후 씬 활성화
             yield return new WaitForSeconds(0.1f);
             
             asyncLoad.allowSceneActivation = true;
+            Debug.Log("[Portal] 씬 활성화 허용");
             
             // 씬 전환 완료 대기
             while (!asyncLoad.isDone)
             {
                 yield return null;
             }
+            
+            Debug.Log("[Portal] 씬 전환 완료");
+        }
+        else
+        {
+            Debug.LogError("[Portal] AsyncOperation이 null입니다!");
         }
         
         Debug.Log("씬 전환이 완료되었습니다.");
         
-        // 새로운 씬에서 페이드 인 효과는 SceneFadeManager의 Start()에서 자동 실행
+        // 전환 플래그 리셋 (다음 포털 사용을 위해 - 하지만 이 오브젝트는 파괴됨)
+        isTransitioning = false;
+        
+        // 새로운 씬에서 페이드 인 효과는 SceneFadeManager의 OnSceneLoaded에서 자동 실행
     }
     
     // 배틀 씬인지 확인하는 헬퍼 메서드

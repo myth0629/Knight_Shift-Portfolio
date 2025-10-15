@@ -9,6 +9,9 @@ public class StageManager : MonoBehaviour
     [Header("스테이지 설정")]
     [Tooltip("처음 게임 시작 시 기본 스테이지 레벨 (1부터)")]
     public int defaultStageLevel = 1;
+    
+    [Tooltip("최대 스테이지 수 (스테이지 2까지)")]
+    public int maxStageLevel = 2;
 
     [Tooltip("(선택) 스테이지별 보스 프리팹. 현재 플로우에선 포탈을 통해 보스 씬을 로드하므로 필수는 아님")]
     public GameObject[] bossPrefabs;
@@ -28,11 +31,13 @@ public class StageManager : MonoBehaviour
 
     [Header("현재 상태 (읽기전용)")]
     [SerializeField] private int currentStage; // 영구 스테이지 레벨
-            [SerializeField] private GameObject currentBoss;
+    [SerializeField] private GameObject currentBoss;
     
-            public int BossKillsThisRun { get; private set; } = 0;
+    public int BossKillsThisRun { get; private set; } = 0;
     
-            public int CurrentStage => currentStage;
+    public int CurrentStage => currentStage;
+    public int MaxStage => maxStageLevel;
+    public bool IsLastStage => currentStage >= maxStageLevel;
     [Header("씬 설정")]
     [SerializeField] private string startSceneName = "Start";
 
@@ -119,14 +124,36 @@ public class StageManager : MonoBehaviour
         // 현재 스테이지 클리어 처리
         OnStageCleared?.Invoke(currentStage);
         Debug.Log($"[StageManager] Stage {currentStage} 보스 클리어!");
+        
+        // 게임 타이머 정지
+        if (GameTimer.Instance != null)
+        {
+            GameTimer.Instance.StopTimer();
+            Debug.Log($"[StageManager] 클리어 타임: {GameTimer.Instance.GetFormattedTime()}");
+        }
+        
+        // 보스 처치 카운트 증가
+        BossKillsThisRun++;
 
-        // 영구 스테이지 레벨 +1 저장
-        currentStage += 1;
-        PlayerPrefs.SetInt(StageLevelKey, currentStage);
-        PlayerPrefs.Save();
+        // 스테이지 2 완료 확인
+        if (currentStage >= maxStageLevel)
+        {
+            Debug.Log($"[StageManager] 최종 스테이지({maxStageLevel}) 클리어! 게임 종료");
+            // 엔딩 씬으로 이동하거나 게임 종료
+            StartCoroutine(LoadEndingScene());
+        }
+        else
+        {
+            // 영구 스테이지 레벨 +1 저장
+            currentStage += 1;
+            PlayerPrefs.SetInt(StageLevelKey, currentStage);
+            PlayerPrefs.Save();
+            
+            Debug.Log($"[StageManager] 다음 스테이지로 진행: Stage {currentStage}");
 
-        // 지연 후 Start 씬으로 이동하여 루틴을 처음부터 반복
-        StartCoroutine(LoadStartSceneAfterDelay());
+            // 지연 후 Start 씬으로 이동하여 루틴을 처음부터 반복
+            StartCoroutine(LoadStartSceneAfterDelay());
+        }
     }
 
     private IEnumerator LoadStartSceneAfterDelay()
@@ -136,14 +163,94 @@ public class StageManager : MonoBehaviour
         {
             yield return new WaitForSeconds(wait);
         }
+        
+        // 맵 초기화 (새로운 스테이지를 위해)
+        if (MapSystem.MapController.Instance != null)
+        {
+            Debug.Log("[StageManager] 맵 초기화 중...");
+            MapSystem.MapController.Instance.ResetAndRegenerateMap();
+        }
 
         if (!string.IsNullOrEmpty(startSceneName))
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene(startSceneName);
+            // SceneFadeManager가 있으면 페이드 효과와 함께 전환
+            if (SceneFadeManager.Instance != null)
+            {
+                yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
+            }
+            
+            // 비동기 씬 로딩으로 변경 (로딩 중 멈춤 방지)
+            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 시작...");
+            AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(startSceneName);
+            
+            // 씬 로딩이 완료될 때까지 대기
+            while (!asyncLoad.isDone)
+            {
+                Debug.Log($"[StageManager] 로딩 진행률: {asyncLoad.progress * 100}%");
+                yield return null;
+            }
+            
+            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 완료!");
         }
         else
         {
             Debug.LogWarning("[StageManager] startSceneName 미설정. 씬 전환이 수행되지 않습니다.");
+        }
+    }
+    
+    private IEnumerator LoadEndingScene()
+    {
+        float wait = Mathf.Max(0f, delayAfterBossDefeat);
+        if (wait > 0f)
+        {
+            yield return new WaitForSeconds(wait);
+        }
+        
+        // 엔딩 씬 이름 (Build Settings에 추가되어 있어야 함)
+        string endingSceneName = "Ending";
+        
+        // SceneFadeManager가 있으면 페이드 효과와 함께 전환
+        if (SceneFadeManager.Instance != null)
+        {
+            yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
+        }
+        
+        // 엔딩 씬 로드 시도
+        if (Application.CanStreamedLevelBeLoaded(endingSceneName))
+        {
+            Debug.Log($"[StageManager] {endingSceneName} 씬 로딩 시작...");
+            AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(endingSceneName);
+            
+            // 씬 로딩이 완료될 때까지 대기
+            while (!asyncLoad.isDone)
+            {
+                Debug.Log($"[StageManager] 로딩 진행률: {asyncLoad.progress * 100}%");
+                yield return null;
+            }
+            
+            Debug.Log($"[StageManager] {endingSceneName} 씬 로딩 완료!");
+        }
+        else
+        {
+            // 엔딩 씬이 없으면 Start 씬으로 복귀 (또는 게임 종료)
+            Debug.LogWarning($"[StageManager] 엔딩 씬 '{endingSceneName}'을 찾을 수 없습니다. Start 씬으로 복귀합니다.");
+            
+            // 스테이지 리셋 (게임 재시작)
+            currentStage = defaultStageLevel;
+            PlayerPrefs.SetInt(StageLevelKey, currentStage);
+            PlayerPrefs.Save();
+            
+            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 시작...");
+            AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(startSceneName);
+            
+            // 씬 로딩이 완료될 때까지 대기
+            while (!asyncLoad.isDone)
+            {
+                Debug.Log($"[StageManager] 로딩 진행률: {asyncLoad.progress * 100}%");
+                yield return null;
+            }
+            
+            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 완료!");
         }
     }
 }

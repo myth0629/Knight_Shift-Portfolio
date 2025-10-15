@@ -24,27 +24,35 @@ public class SceneFadeManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            
+
             // Fade Panel 초기 설정
             if (fadePanel != null)
             {
                 fadePanel.color = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 0f);
+                fadePanel.raycastTarget = false; // 초기화 시 레이캐스트 차단 해제
                 fadePanel.gameObject.SetActive(true);
-                
+
                 // Fade Panel이 최상위에 표시되도록 설정
                 Canvas canvas = fadePanel.GetComponentInParent<Canvas>();
                 if (canvas != null)
                 {
                     canvas.sortingOrder = 999; // 최상위 레이어
                 }
+
+                Debug.Log("[SceneFadeManager] Initialized - raycastTarget set to FALSE");
             }
-            
+
             // 씬 로드 이벤트 구독
             UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
         }
         else
         {
             Destroy(gameObject);
+        }
+        
+        if(fadePanel == null)
+        {
+            fadePanel = GameObject.Find("Fade Panel").GetComponent<Image>();
         }
     }
 
@@ -59,10 +67,28 @@ public class SceneFadeManager : MonoBehaviour
 
     private void Start()
     {
-        // 게임 시작 시 페이드 인 효과
+        // 게임 최초 시작 시에는 페이드 효과 없이 바로 시작
+        // 씬 전환 시에만 OnSceneLoaded에서 페이드 인이 작동함
         if (fadePanel != null)
         {
-            StartCoroutine(FadeIn());
+            // 초기 상태: 투명하고 레이캐스트 비활성화
+            fadePanel.color = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 0f);
+            fadePanel.raycastTarget = false;
+            Debug.Log("[SceneFadeManager] Start - No fade effect on initial game start");
+        }
+    }
+
+    private void Update()
+    {
+        // 안전장치: 페이드가 끝났는데도 raycastTarget이 활성화되어 있으면 강제 해제
+        if (fadePanel != null && !isFading)
+        {
+            // 화면이 완전히 투명한데 raycastTarget이 켜져있으면 버그
+            if (fadePanel.color.a < 0.01f && fadePanel.raycastTarget)
+            {
+                fadePanel.raycastTarget = false;
+                Debug.LogWarning("[SceneFadeManager] Bug detected! Force disabled raycastTarget (alpha is near 0 but raycast was enabled)");
+            }
         }
     }
     
@@ -71,6 +97,32 @@ public class SceneFadeManager : MonoBehaviour
     /// </summary>
     private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
     {
+        // 씬 전환 시마다 Fade Panel 재검색 (Missing 방지)
+        if (fadePanel == null)
+        {
+            GameObject fadePanelObj = GameObject.Find("Fade Panel");
+            if (fadePanelObj != null)
+            {
+                fadePanel = fadePanelObj.GetComponent<Image>();
+                if (fadePanel != null)
+                {
+                    Debug.Log($"[OnSceneLoaded] Found Fade Panel in scene: {scene.name}");
+                    
+                    // Fade Panel이 최상위에 표시되도록 설정
+                    Canvas canvas = fadePanel.GetComponentInParent<Canvas>();
+                    if (canvas != null)
+                    {
+                        canvas.sortingOrder = 999;
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"[OnSceneLoaded] Fade Panel not found in scene: {scene.name}");
+                return;
+            }
+        }
+        
         // 새 씬 로드 후 페이드 인 효과
         if (fadePanel != null)
         {
@@ -78,8 +130,14 @@ public class SceneFadeManager : MonoBehaviour
             Color currentColor = fadePanel.color;
             if (currentColor.a > 0.5f) // 화면이 어두운 상태라면
             {
-                Debug.Log($"Scene loaded: {scene.name}, starting fade in...");
+                Debug.Log($"[OnSceneLoaded] Scene: {scene.name}, alpha: {currentColor.a:F2}, starting fade in...");
                 StartCoroutine(FadeIn());
+            }
+            else
+            {
+                // 화면이 이미 밝은 상태라면 raycastTarget만 확실히 해제
+                fadePanel.raycastTarget = false;
+                Debug.Log($"[OnSceneLoaded] Scene: {scene.name}, already bright (alpha: {currentColor.a:F2}), ensuring raycast disabled");
             }
         }
     }
@@ -89,15 +147,46 @@ public class SceneFadeManager : MonoBehaviour
     /// </summary>
     public IEnumerator FadeOut()
     {
-        if (fadePanel == null || isFading)
+        if (fadePanel == null)
         {
-            Debug.LogWarning("Fade panel is null or already fading!");
+            Debug.LogWarning("[FadeOut] Fade panel is null!");
             yield break;
+        }
+
+        if (isFading)
+        {
+            Debug.LogWarning("[FadeOut] Already fading! Waiting for current fade to complete...");
+            // 이미 페이딩 중이면 완료될 때까지 대기
+            float timeout = 3f; // 3초 타임아웃 (페이드 최대 시간보다 길게)
+            float elapsed = 0f;
+            while (isFading && elapsed < timeout)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            
+            if (isFading)
+            {
+                Debug.LogError($"[FadeOut] Fade timeout after {timeout} seconds! Forcing fade state reset.");
+                isFading = false;
+                
+                // 패널 상태 강제 리셋
+                if (fadePanel != null)
+                {
+                    fadePanel.color = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 0f);
+                    fadePanel.raycastTarget = false;
+                }
+            }
+            else
+            {
+                Debug.Log("[FadeOut] Previous fade completed, proceeding with new fade.");
+            }
         }
 
         isFading = true;
         fadePanel.gameObject.SetActive(true);
         fadePanel.raycastTarget = true; // 페이드아웃 시작 시 레이캐스트 차단 활성화
+        Debug.Log("[FadeOut] Started - Raycast blocking enabled");
 
         float elapsedTime = 0f;
         Color startColor = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 0f);
@@ -112,7 +201,9 @@ public class SceneFadeManager : MonoBehaviour
         }
 
         fadePanel.color = endColor;
+        // FadeOut 완료 후에도 raycastTarget은 유지 (씬 전환 중이므로)
         isFading = false;
+        Debug.Log("[FadeOut] Complete - raycastTarget still enabled for scene transition");
     }
 
     /// <summary>
@@ -120,17 +211,24 @@ public class SceneFadeManager : MonoBehaviour
     /// </summary>
     public IEnumerator FadeIn()
     {
-        if (fadePanel == null || isFading)
+        if (fadePanel == null)
         {
-            Debug.LogWarning("Fade panel is null or already fading!");
+            Debug.LogWarning("Fade panel is null!");
+            yield break;
+        }
+
+        if (isFading)
+        {
+            Debug.LogWarning("Already fading! Skipping FadeIn.");
             yield break;
         }
 
         isFading = true;
         fadePanel.gameObject.SetActive(true);
         fadePanel.raycastTarget = true; // 페이드인 시작 시 레이캐스트 차단 활성화
+        Debug.Log("[FadeIn] Started - Raycast blocking enabled");
 
-        // 페이드인 시작 전 1초 대기 (검은 화면 유지)
+        // 페이드인 시작 전 0.5초 대기 (검은 화면 유지)
         yield return new WaitForSeconds(0.5f);
 
         float elapsedTime = 0f;
@@ -148,6 +246,7 @@ public class SceneFadeManager : MonoBehaviour
         fadePanel.color = endColor;
         fadePanel.raycastTarget = false; // 페이드인 완료 후 레이캐스트 차단 해제
         isFading = false;
+        Debug.Log("[FadeIn] Complete - Raycast blocking DISABLED");
     }
 
     /// <summary>
@@ -174,6 +273,8 @@ public class SceneFadeManager : MonoBehaviour
         {
             fadePanel.color = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 1f);
             fadePanel.gameObject.SetActive(true);
+            fadePanel.raycastTarget = true; // 즉시 페이드아웃 시 레이캐스트 차단
+            Debug.Log("[SetFadeOut] Instant fade out - Raycast blocking enabled");
         }
     }
 
@@ -186,6 +287,8 @@ public class SceneFadeManager : MonoBehaviour
         {
             fadePanel.color = new Color(fadeColor.r, fadeColor.g, fadeColor.b, 0f);
             fadePanel.gameObject.SetActive(true);
+            fadePanel.raycastTarget = false; // 즉시 페이드인 시 레이캐스트 차단 해제
+            Debug.Log("[SetFadeIn] Instant fade in - Raycast blocking DISABLED");
         }
     }
 

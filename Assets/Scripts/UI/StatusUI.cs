@@ -11,6 +11,7 @@ public class StatusUI : MonoBehaviour, IUIPanel
     public TextMeshProUGUI weaponNameText;
     public TextMeshProUGUI weaponAttackText;
     public TextMeshProUGUI weaponTierText; // 무기 티어 텍스트 추가
+    public TextMeshProUGUI stageText; // 스테이지 표시 텍스트 추가
     
     [Header("패널")]
     public GameObject statusPanel;
@@ -79,6 +80,20 @@ public class StatusUI : MonoBehaviour, IUIPanel
         {
             upgradeSystem = WeaponUpgradeSystem.Instance;
             Debug.Log("WeaponUpgradeSystem 늦은 초기화 완료");
+        }
+        
+        // 스테이지 표시 업데이트
+        UpdateStageDisplay();
+    }
+    
+    /// <summary>
+    /// 스테이지 표시 업데이트
+    /// </summary>
+    private void UpdateStageDisplay()
+    {
+        if (stageText != null && StageManager.Instance != null)
+        {
+            stageText.text = $"Stage {StageManager.Instance.CurrentStage}";
         }
     }
     
@@ -205,7 +220,7 @@ public class StatusUI : MonoBehaviour, IUIPanel
                     {
                         weaponDisplayName += $" +{upgradeLevel}";
                     }
-                    weaponNameText.text = $"{weaponDisplayName} + {upgradeLevel}";
+                    weaponNameText.text = weaponDisplayName;
                 }
                 
                 // 무기 티어 표시
@@ -214,17 +229,18 @@ public class StatusUI : MonoBehaviour, IUIPanel
                     weaponTierText.text = $"Tier {weaponData.tier}";
                 }
                 
-                // 무기 공격력 계산 및 표시
+                // 무기 공격력 계산 및 표시 (실제 데미지와 동일하게 계산)
                 if (weaponAttackText != null)
                 {
+                    // Weapon.GetActualDamage()와 동일한 계산 방식 사용
                     float baseAttack = weaponData.damage;
-                    // 강화에 따른 공격력 증가 (예: 강화 1당 10% 증가)
-                    float enhancedAttack = baseAttack * (1 + (upgradeLevel * 0.1f));
+                    // 강화에 따른 공격력 증가 (강화 1당 20% 증가)
+                    float enhancedAttack = baseAttack * (1f + (upgradeLevel * 0.2f));
                     
                     weaponAttackText.text = $"ATK : {Mathf.RoundToInt(enhancedAttack)}";
                 }
                 
-                Debug.Log($"무기 정보 업데이트: {weaponData.weaponName} +{upgradeLevel}, Tier {weaponData.tier}, ATK: {weaponData.damage * (1 + (upgradeLevel * 0.1f))}");
+                Debug.Log($"무기 정보 업데이트: {weaponData.weaponName} +{upgradeLevel}, Tier {weaponData.tier}, ATK: {weaponData.damage * (1f + (upgradeLevel * 0.2f))}");
             }
             else
             {

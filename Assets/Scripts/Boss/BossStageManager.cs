@@ -34,7 +34,26 @@ public class BossStageManager : MonoBehaviour
     {
         if (!isTransitioning)
         {
-            Debug.Log("보스 사망! 씬 전환 시작...");
+            Debug.Log("보스 사망! 타이머 정지 및 랭킹 패널 표시...");
+            
+            // 게임 타이머 정지
+            if (GameTimer.Instance != null)
+            {
+                GameTimer.Instance.StopTimer();
+                Debug.Log($"[BossStageManager] 클리어 타임: {GameTimer.Instance.GetFormattedTime()}");
+            }
+            
+            // 랭킹 패널 표시
+            RankingPanel rankingPanel = FindFirstObjectByType<RankingPanel>();
+            if (rankingPanel != null)
+            {
+                rankingPanel.ShowRanking(1f); // 1초 후 랭킹 패널 표시
+            }
+            else
+            {
+                Debug.LogWarning("[BossStageManager] RankingPanel을 찾을 수 없습니다!");
+            }
+            
             StartCoroutine(TransitionToNextScene());
         }
     }
@@ -47,35 +66,42 @@ public class BossStageManager : MonoBehaviour
         Debug.Log($"{delayBeforeTransition}초 대기 중...");
         yield return new WaitForSeconds(delayBeforeTransition);
         
-        // 맵 초기화 (새로운 스테이지 시작을 위해)
-        if (MapSystem.MapController.Instance != null)
+        // StageManager가 있으면 그쪽에서 처리 (스테이지 로직 통합)
+        if (StageManager.Instance != null)
         {
-            Debug.Log("[BossStageManager] 맵 초기화 중...");
-            MapSystem.MapController.Instance.ResetAndRegenerateMap();
+            Debug.Log("[BossStageManager] StageManager에게 보스 처치 알림 전달");
+            StageManager.Instance.NotifyBossDefeated();
         }
         else
         {
-            Debug.LogWarning("[BossStageManager] MapController를 찾을 수 없습니다.");
-        }
-        
-        // SceneFadeManager가 있으면 페이드 효과와 함께 전환
-        if (SceneFadeManager.Instance != null)
-        {
-            Debug.Log($"페이드 효과와 함께 {nextSceneName} 씬으로 전환");
+            // StageManager가 없는 경우 기본 동작 (맵 초기화 후 Start 씬으로)
+            Debug.LogWarning("[BossStageManager] StageManager를 찾을 수 없습니다. 기본 동작으로 진행합니다.");
             
-            // 페이드 아웃
-            yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
+            // 맵 초기화
+            if (MapSystem.MapController.Instance != null)
+            {
+                Debug.Log("[BossStageManager] 맵 초기화 중...");
+                MapSystem.MapController.Instance.ResetAndRegenerateMap();
+            }
             
-            // 씬 로드
-            SceneManager.LoadScene(nextSceneName);
+            // SceneFadeManager가 있으면 페이드 효과와 함께 전환
+            if (SceneFadeManager.Instance != null)
+            {
+                yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
+            }
             
-            // 페이드 인은 SceneFadeManager의 OnSceneLoaded에서 자동 처리
-        }
-        else
-        {
-            // SceneFadeManager가 없으면 바로 전환
-            Debug.LogWarning("SceneFadeManager를 찾을 수 없습니다. 즉시 씬 전환합니다.");
-            SceneManager.LoadScene(nextSceneName);
+            // 비동기 씬 로딩으로 변경 (로딩 중 멈춤 방지)
+            Debug.Log($"[BossStageManager] {nextSceneName} 씬 로딩 시작...");
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(nextSceneName);
+            
+            // 씬 로딩이 완료될 때까지 대기
+            while (!asyncLoad.isDone)
+            {
+                Debug.Log($"[BossStageManager] 로딩 진행률: {asyncLoad.progress * 100}%");
+                yield return null;
+            }
+            
+            Debug.Log($"[BossStageManager] {nextSceneName} 씬 로딩 완료!");
         }
     }
 
