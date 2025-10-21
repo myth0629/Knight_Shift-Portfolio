@@ -16,6 +16,7 @@ namespace MapSystem
         [SerializeField] private GameObject tooltipPanel;
         [SerializeField] private TextMeshProUGUI tooltipTitle;
         [SerializeField] private TextMeshProUGUI tooltipDescription;
+        [SerializeField] private TextMeshProUGUI stageText; // 스테이지 표시 텍스트
         
         [Header("Map Appearance")]
         [SerializeField] private float nodeSpacingX = 150f;
@@ -57,6 +58,9 @@ namespace MapSystem
                 return;
             }
             
+            // 스테이지 텍스트 업데이트
+            UpdateStageText();
+            
             // Initialize the map UI
             Invoke("InitializeMapUI", 0.3f);
             
@@ -64,6 +68,21 @@ namespace MapSystem
             if (UIPanelManager.Instance != null)
             {
                 UIPanelManager.Instance.RegisterPanel(this);
+            }
+        }
+
+        /// 스테이지 텍스트 업데이트
+        private void UpdateStageText()
+        {
+            if (stageText != null && StageManager.Instance != null)
+            {
+                int currentStage = StageManager.Instance.CurrentStage;
+                stageText.text = $"스테이지 {currentStage}";
+                Debug.Log($"[MapUIManager] 스테이지 텍스트 업데이트: Stage {currentStage}");
+            }
+            else if (stageText == null)
+            {
+                Debug.LogWarning("[MapUIManager] StageText가 할당되지 않았습니다!");
             }
         }
 
@@ -75,6 +94,12 @@ namespace MapSystem
                 UIPanelManager.Instance.UnregisterPanel(this);
             }
         }
+        
+        private void OnEnable()
+        {
+            // 맵이 활성화될 때마다 스테이지 텍스트 업데이트
+            UpdateStageText();
+        }
 
         void Update()
         {
@@ -84,6 +109,10 @@ namespace MapSystem
         public void InitializeMapUI()
         {
             Debug.Log("Initializing map UI");
+            
+            // 맵 초기화 시 스테이지 텍스트 업데이트
+            UpdateStageText();
+            
             // Clear existing nodes
             ClearMapUI();
 
@@ -331,10 +360,16 @@ namespace MapSystem
                 bool willOpen = !mapContainer.gameObject.activeSelf;
                 mapContainer.gameObject.SetActive(willOpen);
                 
-                // 맵이 열릴 때 UIPanelManager에 알림
-                if (willOpen && UIPanelManager.Instance != null)
+                // 맵이 열릴 때 스테이지 텍스트 업데이트
+                if (willOpen)
                 {
-                    UIPanelManager.Instance.OnPanelOpened(this);
+                    UpdateStageText();
+                    
+                    // UIPanelManager에 알림
+                    if (UIPanelManager.Instance != null)
+                    {
+                        UIPanelManager.Instance.OnPanelOpened(this);
+                    }
                 }
             }
             // ESC 키 처리는 UIPanelManager에서 하도록 제거

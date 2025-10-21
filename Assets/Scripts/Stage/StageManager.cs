@@ -50,19 +50,20 @@ public class StageManager : MonoBehaviour
     public event Action<int> OnStageStarted;    // 스테이지 시작시 (스테이지 번호)
     public event Action<int> OnStageCleared;    // 스테이지 클리어시 (스테이지 번호)
 
-                    void Awake()
-                    {
-                        if (Instance != null && Instance != this)
-                        {
-                            Destroy(gameObject);
-                            return;
-                        }
-                        Instance = this;
-                        DontDestroyOnLoad(gameObject);
-                
-                        // 영구 스테이지 레벨 로드
-                        currentStage = PlayerPrefs.GetInt(StageLevelKey, defaultStageLevel);
-                    }    void Start()
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        // 영구 스테이지 레벨 로드
+        currentStage = PlayerPrefs.GetInt(StageLevelKey, defaultStageLevel);
+    }   
+    void Start()
     {
         // 자동 보스 스폰은 하지 않는다. (포탈을 통해 보스 씬으로 이동)
         OnStageStarted?.Invoke(currentStage);
@@ -144,12 +145,7 @@ public class StageManager : MonoBehaviour
         }
         else
         {
-            // 영구 스테이지 레벨 +1 저장
-            currentStage += 1;
-            PlayerPrefs.SetInt(StageLevelKey, currentStage);
-            PlayerPrefs.Save();
-            
-            Debug.Log($"[StageManager] 다음 스테이지로 진행: Stage {currentStage}");
+            Debug.Log($"[StageManager] 스테이지 {currentStage} 클리어! 다음 스테이지로 진행 준비");
 
             // 지연 후 Start 씬으로 이동하여 루틴을 처음부터 반복
             StartCoroutine(LoadStartSceneAfterDelay());
@@ -163,6 +159,13 @@ public class StageManager : MonoBehaviour
         {
             yield return new WaitForSeconds(wait);
         }
+        
+        // 스테이지 증가 (씬 로드 전에 먼저 증가)
+        currentStage += 1;
+        PlayerPrefs.SetInt(StageLevelKey, currentStage);
+        PlayerPrefs.Save();
+        
+        Debug.Log($"[StageManager] 스테이지 증가: Stage {currentStage}");
         
         // 맵 초기화 (새로운 스테이지를 위해)
         if (MapSystem.MapController.Instance != null)
@@ -180,7 +183,7 @@ public class StageManager : MonoBehaviour
             }
             
             // 비동기 씬 로딩으로 변경 (로딩 중 멈춤 방지)
-            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 시작...");
+            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 시작... (현재 스테이지: {currentStage})");
             AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(startSceneName);
             
             // 씬 로딩이 완료될 때까지 대기
@@ -190,7 +193,7 @@ public class StageManager : MonoBehaviour
                 yield return null;
             }
             
-            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 완료!");
+            Debug.Log($"[StageManager] {startSceneName} 씬 로딩 완료! 현재 스테이지: {currentStage}");
         }
         else
         {
@@ -206,8 +209,10 @@ public class StageManager : MonoBehaviour
             yield return new WaitForSeconds(wait);
         }
         
-        // 엔딩 씬 이름 (Build Settings에 추가되어 있어야 함)
-        string endingSceneName = "Ending";
+        // 랭킹 씬 이름 (스테이지 2 클리어 후 랭킹 화면)
+        string rankingSceneName = "Ranking";
+        
+        Debug.Log($"[StageManager] 최종 스테이지 클리어! {rankingSceneName} 씬으로 이동");
         
         // SceneFadeManager가 있으면 페이드 효과와 함께 전환
         if (SceneFadeManager.Instance != null)
@@ -215,11 +220,11 @@ public class StageManager : MonoBehaviour
             yield return StartCoroutine(SceneFadeManager.Instance.FadeOut());
         }
         
-        // 엔딩 씬 로드 시도
-        if (Application.CanStreamedLevelBeLoaded(endingSceneName))
+        // 랭킹 씬 로드 시도
+        if (Application.CanStreamedLevelBeLoaded(rankingSceneName))
         {
-            Debug.Log($"[StageManager] {endingSceneName} 씬 로딩 시작...");
-            AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(endingSceneName);
+            Debug.Log($"[StageManager] {rankingSceneName} 씬 로딩 시작...");
+            AsyncOperation asyncLoad = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(rankingSceneName);
             
             // 씬 로딩이 완료될 때까지 대기
             while (!asyncLoad.isDone)
@@ -228,12 +233,12 @@ public class StageManager : MonoBehaviour
                 yield return null;
             }
             
-            Debug.Log($"[StageManager] {endingSceneName} 씬 로딩 완료!");
+            Debug.Log($"[StageManager] {rankingSceneName} 씬 로딩 완료!");
         }
         else
         {
-            // 엔딩 씬이 없으면 Start 씬으로 복귀 (또는 게임 종료)
-            Debug.LogWarning($"[StageManager] 엔딩 씬 '{endingSceneName}'을 찾을 수 없습니다. Start 씬으로 복귀합니다.");
+            // 랭킹 씬이 없으면 Start 씬으로 복귀
+            Debug.LogWarning($"[StageManager] 랭킹 씬 '{rankingSceneName}'을 찾을 수 없습니다. Start 씬으로 복귀합니다.");
             
             // 스테이지 리셋 (게임 재시작)
             currentStage = defaultStageLevel;
