@@ -4,6 +4,28 @@ using System.Threading.Tasks;
 
 public class FirebaseAuthManager : MonoBehaviour
 {
+    public static FirebaseAuthManager Instance { get; private set; }
+    
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+    
+    /// <summary>
+    /// 현재 로그인한 Firebase 사용자 반환
+    /// </summary>
+    public FirebaseUser GetCurrentUser()
+    {
+        return FirebaseInit.User;
+    }
     
     public async Task<bool> Register(string email, string password, string passwordConfirm)
     {

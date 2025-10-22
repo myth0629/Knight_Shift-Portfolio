@@ -81,7 +81,7 @@ namespace EnemyAI
 
         private void Update()
         {
-            if (golemAI.IsDead())
+            if (golemAI.IsDead)
             {
                 if (agent.enabled) agent.isStopped = true;
                 anim.SetBool("IsMoving", false);

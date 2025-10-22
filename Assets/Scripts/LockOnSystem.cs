@@ -33,6 +33,12 @@ public class LockOnSystem : MonoBehaviour
     private const int NORMAL_PRIORITY = 10;
     // 락온 카메라가 활성화될 때의 우선순위
     private const int LOCKON_PRIORITY = 20;
+    
+    // 타겟의 체력 컴포넌트 캐시 (성능 최적화)
+    private Component targetHealthComponent = null;
+    private System.Type targetHealthType = null;
+    private System.Reflection.PropertyInfo currentHealthProperty = null;
+    private System.Reflection.PropertyInfo isDeadProperty = null;
 
 
     private void Awake()
@@ -102,44 +108,10 @@ public class LockOnSystem : MonoBehaviour
             Unlock();
         }
 
-        // 타겟이 죽었는지 확인하여 자동 언락
-        if (CurrentTarget != null)
+        // 타겟이 죽었는지 확인하여 자동 언락 (캐시된 컴포넌트 사용으로 성능 최적화)
+        if (CurrentTarget != null && targetHealthComponent != null)
         {
-            // 적의 Health 컴포넌트를 찾아서 사망 상태 확인
-            var healthComponents = CurrentTarget.GetComponents<MonoBehaviour>();
-            foreach (var component in healthComponents)
-            {
-                if (component == null) continue;
-                
-                var type = component.GetType();
-                // EnemyHealth, BossHealth 등 다양한 체력 컴포넌트 지원
-                if (type.Name.Contains("Health"))
-                {
-                    // IsDead 속성 확인
-                    var isDeadProperty = type.GetProperty("IsDead");
-                    if (isDeadProperty != null)
-                    {
-                        object value = isDeadProperty.GetValue(component);
-                        if (value is bool isDead && isDead)
-                        {
-                            Unlock();
-                            break;
-                        }
-                    }
-                    
-                    // 혹은 CurrentHealth 확인 (0 이하면 사망으로 간주)
-                    var currentHealthProperty = type.GetProperty("CurrentHealth");
-                    if (currentHealthProperty != null)
-                    {
-                        object value = currentHealthProperty.GetValue(component);
-                        if ((value is float health && health <= 0) || (value is int healthInt && healthInt <= 0))
-                        {
-                            Unlock();
-                            break;
-                        }
-                    }
-                }
-            }
+            CheckTargetHealth();
         }
 
         // 락온 거리를 벗어나면 자동 언록
@@ -153,12 +125,116 @@ public class LockOnSystem : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 타겟의 체력을 확인하고 죽었으면 즉시 락온 해제
+    /// </summary>
+    private void CheckTargetHealth()
+    {
+        if (targetHealthComponent == null || targetHealthType == null)
+            return;
+            
+        try
+        {
+            // 1순위: IsDead 속성 확인 (가장 명확한 사망 여부)
+            if (isDeadProperty != null)
+            {
+                object value = isDeadProperty.GetValue(targetHealthComponent);
+                if (value is bool isDead && isDead)
+                {
+                    Debug.Log($"[LockOnSystem] 타겟 사망 감지 (IsDead) - 락온 해제");
+                    Unlock();
+                    return;
+                }
+            }
+            
+            // 2순위: CurrentHealth 속성 확인 (0 이하면 사망)
+            if (currentHealthProperty != null)
+            {
+                object value = currentHealthProperty.GetValue(targetHealthComponent);
+                
+                // float 타입 체력
+                if (value is float health && health <= 0f)
+                {
+                    Debug.Log($"[LockOnSystem] 타겟 체력 0 이하 감지 ({health}) - 락온 해제");
+                    Unlock();
+                    return;
+                }
+                
+                // int 타입 체력
+                if (value is int healthInt && healthInt <= 0)
+                {
+                    Debug.Log($"[LockOnSystem] 타겟 체력 0 이하 감지 ({healthInt}) - 락온 해제");
+                    Unlock();
+                    return;
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[LockOnSystem] 타겟 체력 확인 중 오류: {e.Message}");
+            // 오류 발생 시 안전하게 캐시 초기화
+            targetHealthComponent = null;
+            targetHealthType = null;
+            currentHealthProperty = null;
+            isDeadProperty = null;
+        }
+    }
+    
+    /// <summary>
+    /// 타겟의 Health 컴포넌트를 찾아서 캐시
+    /// </summary>
+    private void CacheTargetHealthComponent(Transform target)
+    {
+        // 캐시 초기화
+        targetHealthComponent = null;
+        targetHealthType = null;
+        currentHealthProperty = null;
+        isDeadProperty = null;
+        
+        if (target == null) return;
+        
+        // 모든 MonoBehaviour 컴포넌트 검사
+        var allComponents = target.GetComponents<MonoBehaviour>();
+        foreach (var component in allComponents)
+        {
+            if (component == null) continue;
+            
+            var type = component.GetType();
+            
+            // IsDead 또는 CurrentHealth 속성이 있는지 확인
+            var checkIsDeadProperty = type.GetProperty("IsDead");
+            var checkCurrentHealthProperty = type.GetProperty("CurrentHealth");
+            
+            // 둘 중 하나라도 있으면 체력 컴포넌트로 인식
+            if (checkIsDeadProperty != null || checkCurrentHealthProperty != null)
+            {
+                targetHealthComponent = component;
+                targetHealthType = type;
+                isDeadProperty = checkIsDeadProperty;
+                currentHealthProperty = checkCurrentHealthProperty;
+                
+                Debug.Log($"[LockOnSystem] 타겟의 Health 컴포넌트 캐시 완료: {type.Name}");
+                Debug.Log($"[LockOnSystem] - IsDead 속성: {(isDeadProperty != null ? "있음" : "없음")}");
+                Debug.Log($"[LockOnSystem] - CurrentHealth 속성: {(currentHealthProperty != null ? "있음" : "없음")}");
+                break;
+            }
+        }
+        
+        if (targetHealthComponent == null)
+        {
+            Debug.LogWarning($"[LockOnSystem] 타겟 '{target.name}'에서 IsDead 또는 CurrentHealth 속성을 가진 컴포넌트를 찾을 수 없습니다.");
+        }
+    }
+
     private void LockOn()
     {
         Transform nearestTarget = FindNearestTarget(); // 이 부분은 원래의 '가까운 적 찾기'로 되돌렸습니다.
         if (nearestTarget != null)
         {
             CurrentTarget = nearestTarget; // CurrentTarget은 적의 루트 Transform을 유지
+            
+            // 타겟의 Health 컴포넌트를 캐시 (성능 최적화 + 빠른 사망 감지)
+            CacheTargetHealthComponent(CurrentTarget);
             
             // CurrentTarget의 자식 중에 "AimTarget"이라는 이름의 오브젝트를 찾습니다.
             Transform aimPoint = CurrentTarget.Find("LockOnTarget");
@@ -187,6 +263,12 @@ public class LockOnSystem : MonoBehaviour
         }
         
         CurrentTarget = null;
+        
+        // Health 컴포넌트 캐시 초기화
+        targetHealthComponent = null;
+        targetHealthType = null;
+        currentHealthProperty = null;
+        isDeadProperty = null;
         
         // 진행 중인 전환 코루틴이 있다면 중지
         if (transitionCoroutine != null)

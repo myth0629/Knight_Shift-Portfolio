@@ -62,11 +62,25 @@ public class StageManager : MonoBehaviour
 
         // 영구 스테이지 레벨 로드
         currentStage = PlayerPrefs.GetInt(StageLevelKey, defaultStageLevel);
+        Debug.Log($"[StageManager] Awake - 현재 스테이지: {currentStage} (PlayerPrefs에서 로드)");
     }   
     void Start()
     {
         // 자동 보스 스폰은 하지 않는다. (포탈을 통해 보스 씬으로 이동)
+        Debug.Log($"[StageManager] Start - 현재 스테이지: {currentStage}");
         OnStageStarted?.Invoke(currentStage);
+    }
+    
+    /// <summary>
+    /// 스테이지를 1로 리셋 (게임 재시작용)
+    /// </summary>
+    public void ResetToStage1()
+    {
+        currentStage = 1;
+        PlayerPrefs.SetInt(StageLevelKey, currentStage);
+        PlayerPrefs.Save();
+        BossKillsThisRun = 0;
+        Debug.Log("[StageManager] 스테이지를 1로 리셋 완료");
     }
 
     IEnumerator CoStartStage(int stage)
@@ -126,11 +140,10 @@ public class StageManager : MonoBehaviour
         OnStageCleared?.Invoke(currentStage);
         Debug.Log($"[StageManager] Stage {currentStage} 보스 클리어!");
         
-        // 게임 타이머 정지
+        // 타이머는 계속 진행 (랭킹 씬에서 정지)
         if (GameTimer.Instance != null)
         {
-            GameTimer.Instance.StopTimer();
-            Debug.Log($"[StageManager] 클리어 타임: {GameTimer.Instance.GetFormattedTime()}");
+            Debug.Log($"[StageManager] 현재 플레이 시간: {GameTimer.Instance.GetFormattedTime()}");
         }
         
         // 보스 처치 카운트 증가

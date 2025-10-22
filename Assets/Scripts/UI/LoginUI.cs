@@ -56,6 +56,20 @@ public class LoginUI : MonoBehaviour
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
             
+            // 스테이지를 1로 리셋 (새 게임 시작)
+            if (StageManager.Instance != null)
+            {
+                StageManager.Instance.ResetToStage1();
+                Debug.Log("[LoginUI] StageManager를 통해 스테이지 1로 리셋");
+            }
+            else
+            {
+                // StageManager가 아직 없으면 PlayerPrefs에 직접 저장
+                PlayerPrefs.SetInt("StageLevel", 1);
+                PlayerPrefs.Save();
+                Debug.Log("[LoginUI] PlayerPrefs에 스테이지 1 저장 (StageManager 없음)");
+            }
+            
             // 게임 타이머 시작 (로그인 후 게임 시작)
             if (GameTimer.Instance != null)
             {

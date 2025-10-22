@@ -8,8 +8,12 @@ public class GolemAI : MonoBehaviour, IDamageable
     [Header("기본 설정")]
     [SerializeField] public float maxHp = 150f;
     public float currentHp;
-    private bool isDead = false; public bool IsDead() => isDead;
+    private bool isDead = false;
     [SerializeField] int dropGold = 3000;
+    
+    // LockOnSystem이 사망 상태를 감지할 수 있도록 public 프로퍼티 제공
+    public float CurrentHealth => currentHp;
+    public bool IsDead => isDead;
 
     [Header("피격 사운드")]
     [SerializeField] private AudioClip[] hitSounds;

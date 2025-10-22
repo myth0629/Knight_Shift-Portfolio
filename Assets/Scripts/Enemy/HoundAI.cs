@@ -13,6 +13,10 @@ public class HoundAI : MonoBehaviour, IDamageable
 
     [SerializeField] int dropGold = 3000;
     
+    // LockOnSystem이 사망 상태를 감지할 수 있도록 public 프로퍼티 제공
+    public float CurrentHealth => currentHp;
+    public bool IsDead => isDead;
+    
     [Header("피격 사운드")]
     [SerializeField] private AudioClip[] hitSounds;
     [SerializeField] private float hitSoundVolume = 0.8f;
@@ -1856,7 +1860,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
         Debug.Log("공격이 강제로 중단되었습니다.");
     }
 
-    public bool IsDead() => isDead;
+    // IsDead() 메서드는 제거 - 상단의 IsDead 프로퍼티 사용
 
     public void TakeDamage(float damageAmount)
     {
@@ -2005,7 +2009,7 @@ IEnumerator StationaryProjectileAttack() // 새로운 메서드
             animator.SetLayerWeight(upperBodyLayerIndex, 0f);
         }
 
-        Destroy(gameObject, 4f);
+        Destroy(gameObject, 5f);
         playerData.AddGold(dropGold);
 
         // 스테이지 매니저에 보스 처치 알림

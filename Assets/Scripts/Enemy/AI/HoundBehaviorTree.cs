@@ -96,7 +96,7 @@ namespace EnemyAI
         private void Update()
         {
             // 하운드가 죽었거나, 페이즈 전환 패턴 중에는 모든 행동을 중지합니다.
-            if (houndAI != null && (houndAI.IsDead() || houndAI.isPhaseTransitionTriggered))
+            if (houndAI != null && (houndAI.IsDead || houndAI.isPhaseTransitionTriggered))
             {
                 agent.isStopped = true;
                 anim.SetFloat("Speed", 0f);
