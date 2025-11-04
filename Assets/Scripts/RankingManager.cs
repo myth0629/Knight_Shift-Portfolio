@@ -21,7 +21,7 @@ public class RankingManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            InitializeFirebase();
+            Debug.Log("[RankingManager] 인스턴스 생성 완료");
         }
         else
         {
@@ -29,16 +29,49 @@ public class RankingManager : MonoBehaviour
         }
     }
     
-    private void InitializeFirebase()
+    private void Start()
     {
+        // Firebase 초기화를 기다림
+        InitializeFirebase();
+    }
+    
+    private async void InitializeFirebase()
+    {
+        Debug.Log("[RankingManager] Firebase 초기화 대기 중...");
+        
+        // FirebaseInit이 준비될 때까지 대기
+        int maxWaitTime = 10; // 최대 10초 대기
+        int waitedTime = 0;
+        
+        while (!FirebaseInit.IsReady && waitedTime < maxWaitTime)
+        {
+            await Task.Delay(100); // 0.1초 대기
+            waitedTime++;
+        }
+        
+        if (!FirebaseInit.IsReady)
+        {
+            Debug.LogError("[RankingManager] Firebase 초기화 시간 초과!");
+            return;
+        }
+        
         try
         {
-            databaseReference = FirebaseDatabase.DefaultInstance.RootReference;
-            Debug.Log("[RankingManager] Firebase Database 초기화 완료");
+            // FirebaseInit의 DB를 사용
+            databaseReference = FirebaseInit.DB;
+            
+            if (databaseReference != null)
+            {
+                Debug.Log("[RankingManager] ✅ Firebase Database 연결 완료!");
+            }
+            else
+            {
+                Debug.LogError("[RankingManager] ❌ Firebase DB reference가 null입니다!");
+            }
         }
         catch (Exception e)
         {
-            Debug.LogError($"[RankingManager] Firebase 초기화 실패: {e.Message}");
+            Debug.LogError($"[RankingManager] Firebase 초기화 실패: {e.Message}\n{e.StackTrace}");
         }
     }
     
@@ -80,9 +113,9 @@ public class RankingManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 상위 N명의 랭킹 가져오기
+    /// 전체 랭킹 가져오기 (정렬 포함)
     /// </summary>
-    public async Task<List<RankingData>> GetTopRankings(int count = 5)
+    public async Task<List<RankingData>> GetAllRankings(bool ascending = true)
     {
         if (databaseReference == null)
         {
@@ -110,14 +143,12 @@ public class RankingManager : MonoBehaviour
                 
                 // 클리어 시간 기준으로 정렬 (오름차순 - 빠른 시간이 1등)
                 rankings.Sort((a, b) => a.clearTime.CompareTo(b.clearTime));
-                
-                // 상위 N명만 추출
-                if (rankings.Count > count)
+                if (!ascending)
                 {
-                    rankings = rankings.GetRange(0, count);
+                    rankings.Reverse();
                 }
                 
-                Debug.Log($"[RankingManager] 랭킹 {rankings.Count}개 로드 완료");
+                Debug.Log($"[RankingManager] 전체 랭킹 {rankings.Count}개 로드 완료");
             }
             else
             {
@@ -130,6 +161,18 @@ public class RankingManager : MonoBehaviour
         }
         
         return rankings;
+    }
+    
+    /// <summary>
+    /// 상위 N명의 랭킹 가져오기
+    /// </summary>
+    public async Task<List<RankingData>> GetTopRankings(int count = 5)
+    {
+        // 전체 랭킹을 로드한 뒤 상위 N개만 반환
+        var all = await GetAllRankings(true);
+        if (all == null) return new List<RankingData>();
+        if (all.Count <= count) return all;
+        return all.GetRange(0, count);
     }
     
     /// <summary>

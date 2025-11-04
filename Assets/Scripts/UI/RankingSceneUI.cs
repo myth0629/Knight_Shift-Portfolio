@@ -94,29 +94,48 @@ public class RankingSceneUI : MonoBehaviour
             
             Debug.Log($"[RankingSceneUI] ✅ 클리어 시간: {formattedTime} ({clearTimeSeconds}초), 스테이지: {currentStage}");
             
-            // Firebase에 기록 업로드
-            if (RankingManager.Instance != null)
+            // RankingManager가 준비될 때까지 대기
+            if (RankingManager.Instance == null)
             {
-                Debug.Log("[RankingSceneUI] Firebase에 기록 업로드 시도...");
-                bool success = await RankingManager.Instance.UploadClearRecord(
-                    currentUserEmail,
-                    clearTimeSeconds,
-                    formattedTime,
-                    currentStage
-                );
-                
-                if (success)
-                {
-                    Debug.Log("[RankingSceneUI] ✅ 클리어 기록 업로드 성공!");
-                }
-                else
-                {
-                    Debug.LogError("[RankingSceneUI] ❌ 클리어 기록 업로드 실패!");
-                }
+                Debug.LogError("[RankingSceneUI] ❌ RankingManager.Instance가 null입니다!");
             }
             else
             {
-                Debug.LogError("[RankingSceneUI] ❌ RankingManager.Instance가 null입니다!");
+                // Firebase 초기화 대기 (최대 5초)
+                Debug.Log("[RankingSceneUI] RankingManager Firebase 초기화 대기 중...");
+                int maxWait = 50; // 5초 (100ms * 50)
+                int waited = 0;
+                
+                while (!FirebaseInit.IsReady && waited < maxWait)
+                {
+                    await System.Threading.Tasks.Task.Delay(100);
+                    waited++;
+                }
+                
+                if (!FirebaseInit.IsReady)
+                {
+                    Debug.LogError("[RankingSceneUI] ❌ Firebase 초기화 시간 초과!");
+                }
+                else
+                {
+                    // Firebase에 기록 업로드
+                    Debug.Log("[RankingSceneUI] Firebase에 기록 업로드 시도...");
+                    bool success = await RankingManager.Instance.UploadClearRecord(
+                        currentUserEmail,
+                        clearTimeSeconds,
+                        formattedTime,
+                        currentStage
+                    );
+                    
+                    if (success)
+                    {
+                        Debug.Log("[RankingSceneUI] ✅ 클리어 기록 업로드 성공!");
+                    }
+                    else
+                    {
+                        Debug.LogError("[RankingSceneUI] ❌ 클리어 기록 업로드 실패!");
+                    }
+                }
             }
         }
         else
@@ -157,26 +176,31 @@ public class RankingSceneUI : MonoBehaviour
             return;
         }
         
-        Debug.Log("[RankingSceneUI] 상위 5명 랭킹 로드 중...");
+        Debug.Log("[RankingSceneUI] 전체 랭킹 로드 중...");
         
-        // 상위 5명 랭킹 로드
-        List<RankingData> topRankings = await RankingManager.Instance.GetTopRankings(5);
+        // 전체 유저 랭킹 로드 (오름차순 정렬)
+        List<RankingData> allRankings = await RankingManager.Instance.GetAllRankings(true);
         
-        if (topRankings == null)
+        if (allRankings == null)
         {
             Debug.LogError("[RankingSceneUI] ❌ topRankings가 null입니다!");
         }
         else
         {
-            Debug.Log($"[RankingSceneUI] ✅ 상위 랭킹 {topRankings.Count}개 로드됨");
+            Debug.Log($"[RankingSceneUI] ✅ 전체 랭킹 {allRankings.Count}개 로드됨");
         }
         
-        // 상위 랭킹 UI 표시
+        // 화면에는 상위 5명만 표시
+        List<RankingData> topRankings = null;
+        if (allRankings != null)
+        {
+            topRankings = allRankings.Count > 5 ? allRankings.GetRange(0, 5) : new List<RankingData>(allRankings);
+        }
         DisplayTopRankings(topRankings);
         
-        Debug.Log($"[RankingSceneUI] 내 기록 로드 중... (이메일: {currentUserEmail})");
+    Debug.Log($"[RankingSceneUI] 내 기록 로드 중... (이메일: {currentUserEmail})");
         
-        // 내 기록 로드 및 표시
+    // 내 기록 로드 및 표시 (전체 랭킹 기준으로 순위 계산)
         RankingData myRecord = await RankingManager.Instance.GetUserRecord(currentUserEmail);
         
         if (myRecord == null)
@@ -188,7 +212,7 @@ public class RankingSceneUI : MonoBehaviour
             Debug.Log($"[RankingSceneUI] ✅ 내 기록 로드됨: {myRecord.formattedTime}");
         }
         
-        DisplayMyRecord(myRecord, topRankings);
+    DisplayMyRecord(myRecord, allRankings);
     }
     
     private void DisplayEmptyState()
@@ -230,9 +254,10 @@ public class RankingSceneUI : MonoBehaviour
                 var texts = emptyEntry.GetComponentsInChildren<TextMeshProUGUI>();
                 if (texts.Length >= 3)
                 {
-                    texts[0].text = "-";
-                    texts[1].text = "기록 없음";
-                    texts[2].text = "--분 --초";
+                    // 0: 순위, 1: 이메일, 2: 시간
+                    texts[0].text = "-";          // 순위
+                    texts[1].text = "기록 없음";    // 이메일
+                    texts[2].text = "--분 --초";    // 시간
                 }
                 Debug.Log("[RankingSceneUI] 빈 상태 항목 생성됨");
             }
@@ -251,6 +276,8 @@ public class RankingSceneUI : MonoBehaviour
             RankingData data = rankings[i];
             
             GameObject entry = Instantiate(rankingEntryPrefab, topRankingsContainer);
+            // 순서 명시적 설정 (1등부터 위에서 아래로)
+            entry.transform.SetSiblingIndex(i);
             
             // TextMeshProUGUI 컴포넌트 찾기
             TextMeshProUGUI[] texts = entry.GetComponentsInChildren<TextMeshProUGUI>();
@@ -259,23 +286,27 @@ public class RankingSceneUI : MonoBehaviour
             
             if (texts.Length >= 3)
             {
-                // 0: 순위, 1: 이메일, 2: 시간
-                texts[0].text = $"{i + 1}";
-                texts[1].text = MaskEmail(data.email);
-                texts[2].text = data.formattedTime;
-                
+                // 0: 이메일, 1: 순위, 2: 시간 (표시 순서 수정)
+                texts[0].text = MaskEmail(data.email);    // 이메일
+                texts[1].text = $"{i + 1}"; // 순위
+                texts[2].text = data.formattedTime;       // 시간
+
                 // 1등은 금색, 2등은 은색, 3등은 동색으로 표시 (선택사항)
                 if (i == 0)
                 {
-                    texts[0].color = new Color(1f, 0.84f, 0f); // 금색
+                    texts[1].color = new Color(1f, 0.84f, 0f); // 금색 (순위 텍스트 색상)
                 }
                 else if (i == 1)
                 {
-                    texts[0].color = new Color(0.75f, 0.75f, 0.75f); // 은색
+                    texts[1].color = new Color(0.75f, 0.75f, 0.75f); // 은색
                 }
                 else if (i == 2)
                 {
-                    texts[0].color = new Color(0.8f, 0.5f, 0.2f); // 동색
+                    texts[1].color = new Color(0.8f, 0.5f, 0.2f); // 동색
+                }
+                else
+                {
+                    texts[1].color = Color.white;
                 }
             }
             
@@ -283,7 +314,7 @@ public class RankingSceneUI : MonoBehaviour
         }
     }
     
-    private void DisplayMyRecord(RankingData myRecord, List<RankingData> topRankings)
+    private void DisplayMyRecord(RankingData myRecord, List<RankingData> fullRankings)
     {
         Debug.Log("[RankingSceneUI] DisplayMyRecord 호출됨");
         
@@ -298,23 +329,23 @@ public class RankingSceneUI : MonoBehaviour
         
         Debug.Log($"[RankingSceneUI] 내 기록 데이터: {myRecord.email}, {myRecord.formattedTime}");
         
-        // 내 순위 계산
+        // 내 순위 계산 (전체 랭킹 기준)
         int myRank = -1;
-        if (topRankings != null)
+        if (fullRankings != null)
         {
-            myRank = topRankings.FindIndex(r => r.email == myRecord.email) + 1;
+            myRank = fullRankings.FindIndex(r => r.email == myRecord.email) + 1;
             Debug.Log($"[RankingSceneUI] 내 순위: {myRank}");
         }
         
-        if (myRank > 0 && myRank <= 5)
+        if (myRank > 0)
         {
-            if (myRecordText != null) myRecordText.text = $"#{myRank}";
-            Debug.Log($"[RankingSceneUI] ✅ 상위 5위 안에 포함: {myRank}위");
+            if (myRecordText != null) myRecordText.text = $"#{myRank}"; // 전체 순위 표시
+            Debug.Log($"[RankingSceneUI] ✅ 순위 계산: {myRank}위");
         }
         else
         {
             if (myRecordText != null) myRecordText.text = "내 기록";
-            Debug.Log("[RankingSceneUI] 상위 5위 밖 또는 순위 계산 실패");
+            Debug.Log("[RankingSceneUI] 순위 계산 실패");
         }
         
         if (myEmailText != null) myEmailText.text = MaskEmail(myRecord.email);
