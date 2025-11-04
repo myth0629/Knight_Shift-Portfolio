@@ -266,10 +266,9 @@ namespace EnemyAI
                 if (!bb.InAttackRange) return NodeState.Failure;
 
                 float roll = Random.Range(0f, 1f);
-                if (roll < 0.3f) ctx.golemAI.PerformComboAttack();
-                else if (roll < 0.6f) ctx.golemAI.PerformWalkAttack();
-                else if (roll < 0.9f) ctx.golemAI.PerformStationaryAttack();
-                else ctx.golemAI.PerformShieldPattern();
+                if (roll < 0.4f) ctx.golemAI.PerformComboAttack();
+                else if (roll < 0.7f) ctx.golemAI.PerformWalkAttack();
+                else ctx.golemAI.PerformStationaryAttack();
 
                 ctx.attackTimer = ctx.Phase2AttackCooldown;
                 return NodeState.Running;

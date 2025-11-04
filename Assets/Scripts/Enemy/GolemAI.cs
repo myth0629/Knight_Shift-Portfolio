@@ -34,6 +34,7 @@ public class GolemAI : MonoBehaviour, IDamageable
     [SerializeField] float phase2HpThreshold = 0.5f;
     private bool isPhase2 = false;
     private bool hasTriggeredPhase2 = false;
+    public bool isPhase2Transitioning = false;
 
     [Header("이동 설정")]
     [SerializeField] float walkSpeed = 1.5f;
@@ -57,19 +58,14 @@ public class GolemAI : MonoBehaviour, IDamageable
     [SerializeField] int spikeCount = 5;
     [SerializeField] float spikeDelay = 0.2f;
 
-    [Header("쉴드 패턴 설정 (2페이즈 전용)")]
-    [SerializeField] GameObject golemShieldPrefab;
-    [SerializeField] GameObject smallEarthquakePrefab;
+    [Header("2페이즈 이펙트 설정")]
     [SerializeField] GameObject largeEarthquakePrefab;
-    [SerializeField] float smallEarthquakeRadius = 8f;
     [SerializeField] float largeEarthquakeRadius = 15f;
-    [SerializeField] float smallEarthquakeDamage = 5f;
     [SerializeField] float largeEarthquakeDamage = 10f;
 
-    private bool isShieldPatternActive = false;
-    private GameObject golemShield;
-    private GameObject smallEarthquakeEffect;
-    private GameObject largeEarthquakeEffect;
+    private GameObject earthQuakeEffect;
+    private bool phase2EntryLock = false;
+    
 
     [Header("연계 공격 설정")]
     [SerializeField] float comboAttackProbability = 0.3f;
@@ -77,12 +73,10 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     [Header("행동 확률 설정")]
     [SerializeField] float walkAttackProbability = 0.4f;
-    [SerializeField] float stationaryAttackProbability = 0.5f;
-    [SerializeField] float shieldPatternProbability = 0.1f;
+    [SerializeField] float stationaryAttackProbability = 0.6f;
 
     [SerializeField] float phase2WalkAttackProbability = 0.3f;
-    [SerializeField] float phase2StationaryAttackProbability = 0.4f;
-    [SerializeField] float phase2ShieldPatternProbability = 0.3f;
+    [SerializeField] float phase2StationaryAttackProbability = 0.7f;
 
     private float attackTimer = 0f;
     private bool isAttacking = false;
@@ -110,13 +104,13 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     private enum GolemAttackType
     {
-        LeftPunch, RightPunch, GroundSlam, ComboAttack
+        LeftPunch, RightPunch, GroundSlam, ComboAttack, ShieldSlam
     }
     private GolemAttackType currentAttackType;
     PlayerDataManager playerData;
 
     [Header("Behavior Tree Mode")]
-    [SerializeField] private bool useBehaviorTree = false;
+    [SerializeField] private bool useBehaviorTree = true;
     private GolemBehaviorTree golemBehaviorTree;
 
     void Awake()
@@ -215,15 +209,11 @@ public class GolemAI : MonoBehaviour, IDamageable
             }
         }
 
-        if (useBehaviorTree) return;
-
+        // Phase2 체크는 Behavior Tree 모드에서도 필요합니다
         CheckPhase2Transition();
 
-        if (Input.GetKeyDown(KeyCode.G))
-        {
-            Debug.Log("G키 - 강제 쉴드 패턴 실행!");
-            PerformShieldPattern();
-        }
+        // Behavior Tree 모드일 때는 여기서 종료 (수동 입력 처리 스킵)
+        if (useBehaviorTree) return;
 
         if (Input.GetKeyDown(KeyCode.H))
         {
@@ -261,17 +251,50 @@ public class GolemAI : MonoBehaviour, IDamageable
         }
     }
 
+    [Header("2페이즈 아우라 설정")]
+    [SerializeField] private GameObject phase2AuraEffect;  // Inspector에서 할당할 아우라 이펙트
+    private GameObject currentAuraEffect;
+
     void TriggerPhase2()
     {
+        // 이미 2페이즈 전환 중이거나 완료된 경우 무시
+        if (isPhase2Transitioning || hasTriggeredPhase2) return;
+
+        // 진행 중인 모든 코루틴과 상태 초기화
+        StopAllCoroutines();
+        StopMovement();
+        DisableAttackCollider();
+
+        // 2페이즈 상태로 변경
         hasTriggeredPhase2 = true;
         isPhase2 = true;
+        isPhase2Transitioning = true;
+        isAttacking = true;  // 다른 공격을 막기 위해 추가
 
         Debug.Log("=== 골렘 2페이즈 돌입! ===");
 
+        // 2페이즈 스탯 업데이트
         walkSpeed = phase2WalkSpeed;
         attackCooldown = phase2AttackCooldown;
         UpdatePhase2Damage();
+
+        // 2페이즈 아우라 생성
+        if (phase2AuraEffect != null && currentAuraEffect == null)
+        {
+            currentAuraEffect = Instantiate(phase2AuraEffect, transform.position, Quaternion.identity);
+            currentAuraEffect.transform.SetParent(transform);
+            Debug.Log("2페이즈 아우라 생성!");
+        }
+        
+        // 2페이즈 전환 이펙트 시작
         StartCoroutine(Phase2TransitionEffect());
+    }
+
+    IEnumerator ReleasePhase2EntryLock()
+    {
+        // keep the lock for a short period to avoid duplicate post-transition effects
+        yield return new WaitForSeconds(4f);
+        phase2EntryLock = false;
     }
 
     void UpdatePhase2Damage()
@@ -284,22 +307,58 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     IEnumerator Phase2TransitionEffect()
     {
-        StopMovement();
-        isAttacking = true;
-
-        if (golemShieldPrefab != null)
+        // 이미 실행 중인지 확인
+        if (!isPhase2Transitioning)
         {
-            Vector3 shieldPosition = transform.position + Vector3.down * 1.5f;
-            GameObject transitionShield = Instantiate(golemShieldPrefab, shieldPosition, Quaternion.identity);
-            transitionShield.transform.SetParent(transform);
-            yield return new WaitForSeconds(2f);
+            Debug.LogWarning("Phase2TransitionEffect가 isPhase2Transitioning=false 상태에서 호출됨!");
+            yield break;
         }
 
-        isAttacking = false;
-        yield return new WaitForSeconds(0.2f);
+        Debug.Log("Phase2TransitionEffect 시작!");
+        
+        // 모든 상태 초기화 및 락 설정
+        isAttacking = true;
+        phase2EntryLock = true;
+        isComboAttacking = false;
+        isWalkAttacking = false;
 
-        PerformShieldPattern();
+        // 진행 중인 모든 애니메이션 리셋
+        animator.Rebind();
+        animator.Update(0f);
+
+        // 애니메이터 초기화 및 전환 애니메이션 설정
+        animator.SetTrigger("Phase2GroundSlam");
+        animator.ResetTrigger("GroundSlam");
+        animator.SetBool("WalkPunch1", false);
+        animator.SetBool("WalkPunch2", false);
+
+        PlaySound(groundSlamSound);
+        Debug.Log("2페이즈 전환 애니메이션 시작");
+
+        // 첫 번째 임팩트 타이밍까지 대기
+        yield return new WaitForSeconds(1.2f);
+
+        // 임팩트 생성
+        if (largeEarthquakePrefab != null)
+        {
+            GameObject quake = Instantiate(largeEarthquakePrefab, transform.position, Quaternion.identity);
+            DealEarthquakeDamage(largeEarthquakeRadius, largeEarthquakeDamage * phase2DamageMultiplier, "큰 지진");
+            Debug.Log("2페이즈 진입: 큰 지진 발생");
+            Destroy(quake, 3.0f); // 이펙트가 완전히 사라질때까지 충분한 시간
+        }
+
+        // 모든 애니메이션과 이펙트가 완료될 때까지 대기
+        yield return new WaitForSeconds(3.0f);
         Debug.Log("2페이즈 진입 완료!");
+        
+        // 모든 상태 초기화
+        isPhase2Transitioning = false;
+        isAttacking = false;
+        isComboAttacking = false;
+        isWalkAttacking = false;
+
+        // 락 해제 타이머 시작
+        StartCoroutine(ReleasePhase2EntryLock());
     }
 
     void TestGroundSlam()
@@ -325,8 +384,6 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     void RotateTowardsPlayer()
     {
-        if (isShieldPatternActive) return;
-
         Vector3 dirToPlayer = (player.position - transform.position).normalized;
         dirToPlayer.y = 0;
 
@@ -339,9 +396,9 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     void HandleCombatState(float distance)
     {
-        Debug.Log($"전투 상태 체크 - 페이즈: {(isPhase2 ? "2" : "1")}, 거리: {distance:F2}, 공격중: {isAttacking}, 쉴드패턴: {isShieldPatternActive}, 연계공격: {isComboAttacking}, 공격타이머: {attackTimer:F2}");
+        Debug.Log($"전투 상태 체크 - 페이즈: {(isPhase2 ? "2" : "1")}, 거리: {distance:F2}, 공격중: {isAttacking}, 연계공격: {isComboAttacking}, 공격타이머: {attackTimer:F2}");
 
-        if (isShieldPatternActive || isAttacking || isComboAttacking) return;
+        if (isAttacking || isComboAttacking) return;
 
         if (distance <= attackRange && attackTimer <= 0)
         {
@@ -373,27 +430,61 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     void HandlePhase2Combat(float actionRoll)
     {
-        if (actionRoll < comboAttackProbability)
+        // 쉴드 패턴 제거 후 공격 패턴 조정
+        float totalProbability = comboAttackProbability + phase2WalkAttackProbability + phase2StationaryAttackProbability;
+        float normalizedRoll = actionRoll * totalProbability;
+        
+        if (normalizedRoll < comboAttackProbability)
         {
             PerformComboAttack();
         }
-        else if (actionRoll < comboAttackProbability + phase2WalkAttackProbability)
+        else if (normalizedRoll < comboAttackProbability + phase2WalkAttackProbability)
         {
             PerformWalkAttack();
         }
-        else if (actionRoll < comboAttackProbability + phase2WalkAttackProbability + phase2StationaryAttackProbability)
+        else
         {
             PerformStationaryAttack();
         }
-        else
+    }
+
+    public void PerformShieldSlam()
+    {
+        Debug.Log("쉴드 슬램 패턴 시작!");
+        StartCoroutine(ShieldSlamPattern());
+    }
+
+    IEnumerator ShieldSlamPattern()
+    {
+        isAttacking = true;
+        StopMovement();
+        currentAttackType = GolemAttackType.ShieldSlam;
+
+        // 일반 바닥치기 공격
+        animator.SetTrigger("GroundSlam");
+        PlaySound(groundSlamSound);
+
+        yield return new WaitForSeconds(1.2f);
+
+        // 큰 지진만 생성
+        if (largeEarthquakePrefab != null)
         {
-            PerformShieldPattern();
+            GameObject quake = Instantiate(largeEarthquakePrefab, transform.position, Quaternion.identity);
+            DealEarthquakeDamage(largeEarthquakeRadius, largeEarthquakeDamage * (isPhase2 ? phase2DamageMultiplier : 1f), "큰 지진");
+            Debug.Log("쉴드 슬램: 큰 지진 발생");
+            Destroy(quake, 2.0f);
         }
+
+        yield return new WaitForSeconds(2.0f); // 이펙트가 완전히 사라질 때까지 대기
+
+        isAttacking = false;
+        attackTimer = isPhase2 ? phase2AttackCooldown : attackCooldown;
+        Debug.Log("쉴드 슬램 패턴 완료!");
     }
 
     void HandleMovement(float distance)
     {
-        if (isShieldPatternActive || isComboAttacking)
+        if (isComboAttacking)
         {
             StopMovement();
             return;
@@ -555,81 +646,7 @@ public class GolemAI : MonoBehaviour, IDamageable
         }
     }
 
-    public void PerformShieldPattern()
-    {
-        if (isShieldPatternActive || !isPhase2) return;
-        animator.SetBool("ShieldPattern", true);
-        Debug.Log("골렘 쉴드 패턴 시작! (2페이즈 전용)");
 
-        StartCoroutine(ShieldEarthquakePattern());
-    }
-
-    IEnumerator ShieldEarthquakePattern()
-    {
-        isShieldPatternActive = true;
-        animator.SetBool("ShieldPattern", true);
-        StopMovement();
-        if (useBehaviorTree) golemBehaviorTree.SetAttacking(true);
-
-        if (golemShieldPrefab != null)
-        {
-            Vector3 shieldPosition = transform.position + Vector3.down * 1.5f;
-            golemShield = Instantiate(golemShieldPrefab, shieldPosition, Quaternion.identity);
-            golemShield.transform.SetParent(transform);
-            Debug.Log("골렘 쉴드 생성!");
-        }
-
-        if (smallEarthquakePrefab != null)
-        {
-            smallEarthquakeEffect = Instantiate(smallEarthquakePrefab, transform.position, Quaternion.identity);
-            Debug.Log("작은 지진 파티클 생성!");
-        }
-
-        yield return new WaitForSeconds(0.3f);
-        DealEarthquakeDamage(smallEarthquakeRadius, smallEarthquakeDamage * (isPhase2 ? phase2DamageMultiplier : 1f), "작은 지진");
-
-        yield return new WaitForSeconds(0.5f);
-        if (smallEarthquakeEffect != null) Destroy(smallEarthquakeEffect);
-
-        yield return new WaitForSeconds(0.5f);
-
-        if (largeEarthquakePrefab != null)
-        {
-            largeEarthquakeEffect = Instantiate(largeEarthquakePrefab, transform.position, Quaternion.identity);
-            Debug.Log("큰 지진 파티클 생성!");
-        }
-
-        yield return new WaitForSeconds(0.3f);
-        DealEarthquakeDamage(largeEarthquakeRadius, largeEarthquakeDamage * (isPhase2 ? phase2DamageMultiplier : 1f), "큰 지진");
-
-        yield return new WaitForSeconds(0.5f);
-
-        if (golemShield != null)
-        {
-            Destroy(golemShield);
-            Debug.Log("쉴드 파티클 삭제!");
-        }
-        if (largeEarthquakeEffect != null)
-        {
-            Destroy(largeEarthquakeEffect);
-            Debug.Log("큰 지진 파티클 삭제!");
-        }
-
-        soundManager?.PlayShieldPatternEndSound();
-
-        animator.SetBool("ShieldPattern", false);
-        isShieldPatternActive = false;
-        if (useBehaviorTree) golemBehaviorTree.SetAttacking(false);
-        attackTimer = isPhase2 ? phase2AttackCooldown : attackCooldown;
-        Debug.Log("쉴드 패턴 완료!");
-
-        float distance = Vector3.Distance(transform.position, player.position);
-        if (distance > attackRange)
-        {
-            MoveTowardsPlayer();
-            Debug.Log("쉴드 패턴 종료 - 골렘 이동 시작!");
-        }
-    }
 
     void DealEarthquakeDamage(float radius, float damage, string earthquakeType)
     {
@@ -652,6 +669,13 @@ public class GolemAI : MonoBehaviour, IDamageable
 
     public void OnGroundSlamHit()
     {
+        // 2페이즈 전환 중일 때는 아무것도 하지 않음
+        if (isPhase2Transitioning)
+        {
+            return;
+        }
+
+        // 일반 바닥치기 공격일 때만 바위 송곳 생성
         Debug.Log("바닥치기 임팩트! 바위 송곳 생성 시작!");
         StartCoroutine(CreateRockSpikes());
     }
@@ -735,6 +759,8 @@ public class GolemAI : MonoBehaviour, IDamageable
         animator.ResetTrigger("LeftPunch");
         animator.ResetTrigger("RightPunch");
         animator.ResetTrigger("GroundSlam");
+    // Reset the phase2-specific slam trigger as well in case it was used
+    animator.ResetTrigger("Phase2GroundSlam");
 
         float distance = Vector3.Distance(transform.position, player.position);
         if (distance > attackRange)
@@ -806,6 +832,13 @@ public class GolemAI : MonoBehaviour, IDamageable
         mainCollider.enabled = false;
         agent.isStopped = true;
 
+        // 2페이즈 아우라 제거
+        if (currentAuraEffect != null)
+        {
+            Destroy(currentAuraEffect);
+            currentAuraEffect = null;
+        }
+
         if (upperBodyLayerIndex != -1)
         {
             animator.SetLayerWeight(upperBodyLayerIndex, 0f);
@@ -835,16 +868,13 @@ public class GolemAI : MonoBehaviour, IDamageable
         Gizmos.color = Color.blue;
         Gizmos.DrawWireSphere(transform.position, closeRange);
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, smallEarthquakeRadius);
-
-        Gizmos.color = new Color(1f, 0.5f, 0f);
-        Gizmos.DrawWireSphere(transform.position, largeEarthquakeRadius);
-
         if (isPhase2)
         {
             Gizmos.color = Color.magenta;
             Gizmos.DrawWireCube(transform.position + Vector3.up * 3f, Vector3.one);
+            
+            Gizmos.color = new Color(1f, 0.5f, 0f);
+            Gizmos.DrawWireSphere(transform.position, largeEarthquakeRadius);
         }
     }
 
