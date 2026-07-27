@@ -1,0 +1,27 @@
+# Unity generated files
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+.DS_Store
+
+# 포트폴리오 공개본에서 외부 리소스·설정 파일 재추적 방지
+/Assets/Imported Assets/
+/Assets/Monster/
+/Assets/Fantasy knight/
+/Assets/Casual_Hit/
+/Assets/Altar_Ruins_FREE/
+/Assets/Piloto Studio/
+/Assets/Sound/
+/Assets/Font/
+/Assets/Firebase/
+/Assets/ExternalDependencyManager/
+/Assets/Plugins/
+/Assets/Scenes/
+/Assets/StreamingAssets/google-services.json
+/Assets/StreamingAssets/google-services.json.meta
