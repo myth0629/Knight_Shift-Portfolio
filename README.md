@@ -4,6 +4,12 @@
 
 3인 팀 프로젝트에서 메인 클라이언트를 맡아 전투 흐름, Lock-On 카메라, 플레이어 상태 관리, Firebase 로그인·데이터 연동과 랭킹 시스템을 담당했습니다.
 
+## 플레이 영상
+
+[![Knight Shift 플레이 영상](https://img.youtube.com/vi/XWpvMfjUPEw/hqdefault.jpg)](https://youtu.be/XWpvMfjUPEw)
+
+[YouTube에서 플레이 영상 보기](https://youtu.be/XWpvMfjUPEw)
+
 ## 핵심 구현
 
 - **Cinemachine 기반 Lock-On 카메라**: 범위 내 최단거리 적을 선택하고 전용 가상 카메라의 우선순위를 조절해 자연스럽게 전환했습니다. 락온 카메라의 방향을 플레이어 카메라 회전에 동기화해 이동 입력과 시점이 어긋나지 않도록 했습니다.
